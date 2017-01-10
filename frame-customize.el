@@ -57,6 +57,37 @@ Super class for objects that want to persist to the file system.")
 	 (-map #'(lambda (slot)
 		   (cons slot (slot-value this slot)))))))
 
+
+(defclass cframe-persistable (cframe-persistent)
+  ((file :initarg :file
+	 :initform nil
+	 :type (or null string)
+	 :documentation "The file to persist the state of the object."))
+  :documentation "Subclasses that can persist to a file.")
+
+(cl-defmethod cframe-persistable-save ((this cframe-persistable))
+  "Persist manager and compiler configuration."
+  (with-slots (file) this
+    (let ((class-name (->> (cframe-setting) object-class class-name))
+	  (state (cframe-persistent-persist this))))
+    (with-temp-buffer
+      (insert
+       ";; -*- emacs-lisp -*-"
+       ";; Object: %s.  Don't change this file.\n"
+       (format
+	" <%s %s>\n"
+	(time-stamp-string "%02y/%02m/%02d %02H:%02M:%02S")
+	fname)
+       (with-output-to-string
+	 ;; save manager configuration for future iterations
+	 (pp (append (list (cons 'manager nil))
+		     (list (cons 'compilers
+				 (flex-compile-manager-config this)))))
+	 (write-region (point-min) (point-max) file)))
+      (message "Wrote %s" file))))
+
+
+
 
 (defclass cframe-setting (cframe-persistent)
   ((name :initarg :name
@@ -188,53 +219,15 @@ Super class for objects that want to persist to the file system.")
 
 
 
-(defclass cframe-manager (cframe-persistent)
+(defclass cframe-manager (cframe-persistent cframe-persistable)
   ((displays :initarg :displays
-	     :initform nil;(list (cframe-display))
+	     :initform nil
 	     :type list
 	     :documentation "Manages all displays."))
   :documentation "Manages displays.")
 
-(cl-defmethod cframe-persistent-save ((this cframe-persistent))
-  "Persist manager and compiler configuration."
-  (let ((fname compile-flex-persistency-file-name))
-    (with-temp-buffer
-      (insert
-       ";; -*- emacs-lisp -*-"
-       (condition-case nil
-	   (progn
-	     (format
-	      " <%s %s>\n"
-	      (time-stamp-string "%02y/%02m/%02d %02H:%02M:%02S")
-	      fname))
-	 (error "\n"))
-       ";; Frame Customize.  Don't change this file.\n"
-       (with-output-to-string
-	 ;; save manager configuration for future iterations
-	 (pp (append (list (cons 'manager nil))
-		     (list (cons 'compilers
-				 (flex-compile-manager-config this)))))))
-      (write-region (point-min) (point-max) fname)
-      (message "Wrote %s" compile-flex-persistency-file-name))))
-
-(cl-defmethod cframe-manager-file-header ((this cframe-manager))
-  (with-temp-buffer
-    (-> (format "\
-;; -*- emacs-lisp -*-<%s %s>
-;; Flex compiler configuration.  Don't change this file.\n"
-		(time-stamp-string "%02y/%02m/%02d %02H:%02M:%02S")
-		(oref this file))
-	insert)
-    (buffer-string)))
-
 (cl-defmethod object-write ((this cframe-manager) &optional comment)
   (cl-call-next-method this (or comment (oref this file-header-line))))
-
-;; (cl-defmethod initialize-instance ((this cframe-manager) &rest rest)
-;;   (with-slots (slots) this
-;;     (setq slots '(name id sindex)))
-;;   (apply #'cl-call-next-method this rest)
-;;   (cframe-display-set-name this))
 
 (cl-defmethod cframe-manager-display ((this cframe-manager)
 				      &optional no-create-p id)
@@ -269,7 +262,6 @@ Super class for objects that want to persist to the file system.")
     (->> (cframe-persistent-persist this)
 	 quote
 	 prettyprint)))
-
 
 
 
@@ -327,15 +319,7 @@ Super class for objects that want to persist to the file system.")
 (defun cframe-restore ()
   "Restore the state of all custom frame settings."
   (interactive)
-  ;; hack to avoid list types not unpersisting:
-  ;;   eieio-persistent-validate/fix-slot-value: In save file, list of object
-  ;;   constructors found, but no :type specified for slot displays of type nil
-  ;;
-  ;; `flet' needed to bind past lexical scope
-  (flet ((eieio-persistent-validate/fix-slot-value
-	  (&rest rest)
-	  (apply #'eieio-persistent-validate/fix-slot-value-hack rest)))
-    (eieio-persistent-read cframe-persistency-file-name cframe-manager)))
+  )
 
 ;(cframe-manager-reset)
 ;(cframe-display-list)
