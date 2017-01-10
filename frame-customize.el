@@ -116,14 +116,14 @@ Super class for objects that want to persist to the file system.")
 (cl-defmethod cframe-persistable-save ((this cframe-persistable))
   "Persist manager and compiler configuration."
   (with-slots (file) this
-    (let ((class-name (->> this eieio-object-class class-name))
+    (let ((save-class-name (->> this eieio-object-class class-name))
 	  (state (cframe-persistent-persist this)))
       (with-temp-buffer
 	(insert (format "\
 ;; -*- emacs-lisp -*- <%s %s>
 ;; Object: %s.  Don't change this file.\n"
 			(time-stamp-string "%02y/%02m/%02d %02H:%02M:%02S")
-			file class-name))
+			file save-class-name))
 	(insert (with-output-to-string
 		  (pp state)))
 	(write-region (point-min) (point-max) file))
@@ -366,7 +366,11 @@ This modifies the frame settings."
 
 ;;;###autoload
 (defun cframe-reset ()
-  "Reset the state of the custom frame manager."
+  "Reset the state of the custom frame manager.
+
+This blows away all frame settings configuration in memory.  To
+wipe the state on the storage call `cframe-restore' or
+`cframe-add-or-advance-display' after calling this."
   (interactive)
   (setq the-cframe-manager
 	(cframe-manager :file cframe-persistency-file-name)))
