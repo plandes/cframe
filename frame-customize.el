@@ -1,4 +1,4 @@
-;;; frame-customize.el --- customize a frame and fast switch size and positions
+;; frame-customize.el --- customize a frame and fast switch size and positions
 
 ;; Copyright (C) 2015 - 2017 Paul Landes
 
@@ -35,7 +35,6 @@
 ;;; Code:
 
 (require 'eieio)
-;(require 'eieio-base)
 (require 'time-stamp)
 (require 'dash)
 (require 'noflet)
@@ -50,12 +49,60 @@
   :documentation "\
 Super class for objects that want to persist to the file system.")
 
-(cl-defmethod cframe-persistent-persist ((this cframe-persistent))
-  "Persist an object"
+(cl-defmethod cframe-persistent-persist-value ((this cframe-persistent) val)
+  (or (and (consp val)
+	   (or (let ((fval (car val)))
+		 (and fval
+		      (object-p fval)
+		      (object-of-class-p fval cframe-persistent)
+		      (-map #'(lambda (val)
+				(cframe-persistent-persist val))
+			    val)))))
+      val))
+
+(cl-defmethod cframe-persistent-persist-slots ((this cframe-persistent))
+  "Persist the slots of the instance."
   (with-slots (slots) this
     (->> slots
 	 (-map #'(lambda (slot)
-		   (cons slot (slot-value this slot)))))))
+		   (let ((val (->> (slot-value this slot)
+				   (cframe-persistent-persist-value this))))
+		     (cons slot val)))))))
+
+(cl-defmethod cframe-persistent-persist ((this cframe-persistent))
+  "Persist an object."
+  (append `((class . ,(object-class this))
+	    (slots . ,(cframe-persistent-persist-slots this)))
+	  (condition-case nil
+	      (cl-call-next-method this)
+	    (cl-no-next-method))))
+
+(cl-defmethod cframe-persistent-unpersist-value ((this cframe-persistent) val)
+  (or (and (consp val)
+	   (or (let ((fval (car val)))
+		 (and (consp fval)
+		      (consp (car fval))
+		      (eq 'class (caar fval))
+		      (-map #'(lambda (val)
+				(cframe-persistent-unpersist val))
+			    val)))))
+      val))
+
+(cl-defmethod cframe-persistent-unpersist ((this cframe-persistent) vals)
+  "Persist an object."
+  (with-slots (slots) this
+    (->> slots
+	 (-map #'(lambda (slot)
+		   (let ((val (->> (cdr (assq slot vals))
+				   (cframe-persistent-unpersist-value this))))
+		     (set-slot-value this slot val)))))))
+
+(cl-defmethod cframe-persistent-unpersist ((vals list))
+  (let* ((class (cdr (assq 'class vals)))
+	 (slots (cdr (assq 'slots vals)))
+	 (obj (make-instance class)))
+    (cframe-persistent-unpersist obj slots)
+    obj))
 
 
 (defclass cframe-persistable (cframe-persistent)
@@ -69,23 +116,17 @@ Super class for objects that want to persist to the file system.")
   "Persist manager and compiler configuration."
   (with-slots (file) this
     (let ((class-name (->> (cframe-setting) object-class class-name))
-	  (state (cframe-persistent-persist this))))
-    (with-temp-buffer
-      (insert
-       ";; -*- emacs-lisp -*-"
-       ";; Object: %s.  Don't change this file.\n"
-       (format
-	" <%s %s>\n"
-	(time-stamp-string "%02y/%02m/%02d %02H:%02M:%02S")
-	fname)
-       (with-output-to-string
-	 ;; save manager configuration for future iterations
-	 (pp (append (list (cons 'manager nil))
-		     (list (cons 'compilers
-				 (flex-compile-manager-config this)))))
-	 (write-region (point-min) (point-max) file)))
+	  (state (cframe-persistent-persist this)))
+      (with-temp-buffer
+	(insert (format "\
+;; -*- emacs-lisp -*- <%s %s>
+;; Object: %s.  Don't change this file.\n"
+			(time-stamp-string "%02y/%02m/%02d %02H:%02M:%02S")
+			file class-name))
+	(insert (with-output-to-string
+		  (pp state)))
+	(write-region (point-min) (point-max) file))
       (message "Wrote %s" file))))
-
 
 
 
@@ -180,14 +221,33 @@ Super class for objects that want to persist to the file system.")
 	  (list elt)
 	  (subseq seq pos)))
 
+(cl-defmethod cframe-display-index ((this cframe-display) &optional index)
+  (with-slots (settings sindex) this
+    (-> (or index sindex)
+	(mod (length settings)))))
+
+(cl-defmethod cframe-display-set-index ((this cframe-display) index)
+  (with-slots (sindex) this
+    (->> (cframe-display-index this index)
+	 (setq sindex))))
+
+(cl-defmethod cframe-display-inc-index ((this cframe-display)
+					&optional num)
+  (with-slots (sindex) this
+    (cframe-display-set-index this (+ sindex (or num 1)))))
+
+(cl-defmethod cframe-display-setting ((this cframe-display) &optional index)
+  (with-slots (settings) this
+    (nth (cframe-display-index this index) settings)))
+
 (cl-defmethod cframe-display-insert-setting ((this cframe-display)
 					     &optional setting)
   "Add and optionally create first a new setting if SETTING is nil."
   (with-slots (settings sindex) this
     (setq settings
 	  (cframe-display-insert-at-position settings
-				     (or setting (cframe-setting))
-				     sindex))
+					     (or setting (cframe-setting))
+					     sindex))
     (incf sindex)))
 
 (cl-defmethod cframe-display-set-name ((this cframe-display)
@@ -198,24 +258,22 @@ Super class for objects that want to persist to the file system.")
 			(format "(%d X %d)" (car id) (cdr id)))))
       (setq name new-name))))
 
+(cl-defmethod cframe-display-setting-restore ((this cframe-display)
+					      &optional setting)
+  (let ((setting (or setting (cframe-display-setting this))))
+    (cframe-setting-restore setting)))
+
 (cl-defmethod object-format ((this cframe-display))
   (with-slots (name id settings sindex) this
     (format "%s [%s]: %d settings, index: %d"
-	    name id (length settings) sindex)))
+	    name id (length settings)
+	    (cframe-display-index this))))
 
 (cl-defmethod initialize-instance ((this cframe-display) &rest rest)
-  (with-slots (slots) this
-    (setq slots '(name id sindex)))
+  (with-slots (slots lists) this
+    (setq slots '(name id sindex settings)))
   (apply #'cl-call-next-method this rest)
   (cframe-display-set-name this))
-
-(cl-defmethod cframe-persistent-persist ((this cframe-display))
-  (with-slots (settings) this
-    (->> settings
-	 (-map #'(lambda (setting)
-		   (cframe-persistent-persist setting)))
-	 (cons 'settings)
-	 (append (cl-call-next-method this)))))
 
 
 
@@ -223,11 +281,16 @@ Super class for objects that want to persist to the file system.")
   ((displays :initarg :displays
 	     :initform nil
 	     :type list
-	     :documentation "Manages all displays."))
+	     :documentation "Displays that have settings."))
   :documentation "Manages displays.")
 
 (cl-defmethod object-write ((this cframe-manager) &optional comment)
   (cl-call-next-method this (or comment (oref this file-header-line))))
+
+(cl-defmethod initialize-instance ((this cframe-manager) &rest rest)
+  (with-slots (slots) this
+    (setq slots '(displays file)))
+  (apply #'cl-call-next-method this rest))
 
 (cl-defmethod cframe-manager-display ((this cframe-manager)
 				      &optional no-create-p id)
@@ -247,21 +310,13 @@ Super class for objects that want to persist to the file system.")
   (-> (cframe-manager-display this)
       (cframe-display-insert-setting setting)))
 
-(cl-defmethod cframe-persistent-persist ((this cframe-manager))
-  (with-slots (displays) this
-    (->> displays
-	 (-map #'(lambda (setting)
-		   (cframe-persistent-persist setting)))
-	 (cons 'displays)
-	 (append (cl-call-next-method this)))))
+(cl-defmethod cframe-manager-advance-display ((this cframe-manager))
+  "Iterate the settings index in the current display and restore it.
 
-(defun a ()
-  (interactive)
-  (let ((this (cframe-manager)))
-    (cframe-manager-insert-setting this)
-    (->> (cframe-persistent-persist this)
-	 quote
-	 prettyprint)))
+This modifies the frame settings."
+  (let ((display (cframe-manager-display this)))
+    (cframe-display-setting-restore display)
+    (cframe-display-inc-index display)))
 
 
 
@@ -283,19 +338,6 @@ Super class for objects that want to persist to the file system.")
 (defvar the-cframe-manager nil
   "The singleton manager instance.")
 
-(defun cframe-setting-insert ()
-  "Add the current setting to the display."
-  (interactive)
-  (-> the-cframe-manager
-      cframe-manager-insert-setting)
-  (cframe-save))
-
-(defun cframe-manager-reset ()
-  "Reset the state of the custom frame manager."
-  (interactive)
-  (setq the-cframe-manager
-	(cframe-manager :file cframe-persistency-file-name)))
-
 (defun cframe-display-list ()
   "Display a list of displays and their settings."
   (interactive)
@@ -310,22 +352,41 @@ Super class for objects that want to persist to the file system.")
 	    (insert (format "   - %s\n" (object-format setting)))))))
     (display-buffer (current-buffer))))
 
+(defun cframe-add-or-advance-display (addp)
+  "Either add with ADDP the current frame setting advance the next."
+  (interactive (list current-prefix-arg))
+  (if addp
+      (progn
+	(-> the-cframe-manager
+	    cframe-manager-insert-setting)
+	(cframe-save))
+    (-> the-cframe-manager
+	cframe-manager-advance-display)))
+
+(defun cframe-reset ()
+  "Reset the state of the custom frame manager."
+  (interactive)
+  (setq the-cframe-manager
+	(cframe-manager :file cframe-persistency-file-name)))
+
 (defun cframe-save ()
   "Save the state of all custom frame settings."
   (interactive)
   (-> the-cframe-manager
-      eieio-persistent-save))
+      cframe-persistable-save))
 
 (defun cframe-restore ()
   "Restore the state of all custom frame settings."
   (interactive)
-  )
-
-;(cframe-manager-reset)
-;(cframe-display-list)
-;(cframe-setting-insert)
-;(cframe-save)
-;(cframe-restore)
+  (let* ((file (expand-file-name "cframe" user-emacs-directory))
+	 (mng (with-temp-buffer
+		(insert-file file)
+		(->> (read (buffer-string))
+		     cframe-persistent-unpersist))))
+    (oset mng :file file)
+    (setq the-cframe-manager mng)
+    (cframe-manager-advance-display mng)
+    mng))
 
 (provide 'frame-customize)
 
