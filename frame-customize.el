@@ -336,6 +336,7 @@ This modifies the frame settings."
 (defvar the-cframe-manager nil
   "The singleton manager instance.")
 
+;;;###autoload
 (defun cframe-display-list ()
   "Display a list of displays and their settings."
   (interactive)
@@ -350,6 +351,7 @@ This modifies the frame settings."
 	    (insert (format "   - %s\n" (object-format setting)))))))
     (display-buffer (current-buffer))))
 
+;;;###autoload
 (defun cframe-add-or-advance-display (addp)
   "Either add with ADDP the current frame setting advance the next."
   (interactive (list current-prefix-arg))
@@ -362,18 +364,21 @@ This modifies the frame settings."
     (-> the-cframe-manager
 	cframe-manager-advance-display)))
 
+;;;###autoload
 (defun cframe-reset ()
   "Reset the state of the custom frame manager."
   (interactive)
   (setq the-cframe-manager
 	(cframe-manager :file cframe-persistency-file-name)))
 
+;;;###autoload
 (defun cframe-save ()
   "Save the state of all custom frame settings."
   (interactive)
   (-> the-cframe-manager
       cframe-persistable-save))
 
+;;;###autoload
 (defun cframe-restore ()
   "Restore the state of all custom frame settings."
   (interactive)
