@@ -1,0 +1,16 @@
+project:
+  generate:
+    excludes:
+    - makefile$
+    - .travis.yml$
+    - LICENSE$
+  template-directory: make-proj
+  context:
+    project: frame-customize
+    project-name: frame-customize
+    project-short-description: customize a frame and fast switch size and positions
+    project-description: Customize size and positions of a frame.
+    project-author: Paul Landes
+    project-author-github-account: plandes
+    source-keywords: ADD KEYWORDS
+
