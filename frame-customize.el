@@ -1,4 +1,4 @@
-;; frame-customize.el --- customize a frame and fast switch size and positions
+;;; frame-customize.el --- customize a frame and fast switch size and positions
 
 ;; Copyright (C) 2015 - 2017 Paul Landes
 
@@ -34,6 +34,7 @@
 
 ;;; Code:
 
+(require 'cl-lib)
 (require 'eieio)
 (require 'time-stamp)
 (require 'dash)
@@ -53,7 +54,7 @@ Super class for objects that want to persist to the file system.")
   (or (and (consp val)
 	   (or (let ((fval (car val)))
 		 (and fval
-		      (object-p fval)
+		      (eieio-object-p fval)
 		      (object-of-class-p fval cframe-persistent)
 		      (-map #'(lambda (val)
 				(cframe-persistent-persist val))
@@ -71,7 +72,7 @@ Super class for objects that want to persist to the file system.")
 
 (cl-defmethod cframe-persistent-persist ((this cframe-persistent))
   "Persist an object."
-  (append `((class . ,(object-class this))
+  (append `((class . ,(eieio-object-class this))
 	    (slots . ,(cframe-persistent-persist-slots this)))
 	  (condition-case nil
 	      (cl-call-next-method this)
@@ -95,7 +96,7 @@ Super class for objects that want to persist to the file system.")
 	 (-map #'(lambda (slot)
 		   (let ((val (->> (cdr (assq slot vals))
 				   (cframe-persistent-unpersist-value this))))
-		     (set-slot-value this slot val)))))))
+		     (setf (slot-value this slot) val)))))))
 
 (cl-defmethod cframe-persistent-unpersist ((vals list))
   (let* ((class (cdr (assq 'class vals)))
@@ -115,7 +116,7 @@ Super class for objects that want to persist to the file system.")
 (cl-defmethod cframe-persistable-save ((this cframe-persistable))
   "Persist manager and compiler configuration."
   (with-slots (file) this
-    (let ((class-name (->> (cframe-setting) object-class class-name))
+    (let ((class-name (->> (cframe-setting) eieio-object-class class-name))
 	  (state (cframe-persistent-persist this)))
       (with-temp-buffer
 	(insert (format "\
@@ -217,9 +218,9 @@ Super class for objects that want to persist to the file system.")
 
 (defun cframe-display-insert-at-position (seq elt pos)
   "Return SEQ with ELT inserted at position POS."
-  (append (subseq seq 0 pos)
+  (append (cl-subseq seq 0 pos)
 	  (list elt)
-	  (subseq seq pos)))
+	  (cl-subseq seq pos)))
 
 (cl-defmethod cframe-display-index ((this cframe-display) &optional index)
   (with-slots (settings sindex) this
@@ -248,7 +249,7 @@ Super class for objects that want to persist to the file system.")
 	  (cframe-display-insert-at-position settings
 					     (or setting (cframe-setting))
 					     sindex))
-    (incf sindex)))
+    (cl-incf sindex)))
 
 (cl-defmethod cframe-display-set-name ((this cframe-display)
 				       &optional new-name)
@@ -284,9 +285,6 @@ Super class for objects that want to persist to the file system.")
 	     :documentation "Displays that have settings."))
   :documentation "Manages displays.")
 
-(cl-defmethod object-write ((this cframe-manager) &optional comment)
-  (cl-call-next-method this (or comment (oref this file-header-line))))
-
 (cl-defmethod initialize-instance ((this cframe-manager) &rest rest)
   (with-slots (slots) this
     (setq slots '(displays file)))
@@ -297,8 +295,8 @@ Super class for objects that want to persist to the file system.")
   (with-slots (displays) this
     (let* ((id (or id (cframe-display-id)))
 	   (display (->> displays
-			 (remove-if #'(lambda (display)
-					(not (equal id (oref display :id)))))
+			 (cl-remove-if #'(lambda (display)
+					   (not (equal id (oref display :id)))))
 			 car)))
       (when (and (null display) (not no-create-p))
 	(setq display (cframe-display)
@@ -359,7 +357,8 @@ This modifies the frame settings."
       (progn
 	(-> the-cframe-manager
 	    cframe-manager-insert-setting)
-	(cframe-save))
+	(cframe-save)
+	(message "Added setting and saved"))
     (-> the-cframe-manager
 	cframe-manager-advance-display)))
 
@@ -380,7 +379,7 @@ This modifies the frame settings."
   (interactive)
   (let* ((file (expand-file-name "cframe" user-emacs-directory))
 	 (mng (with-temp-buffer
-		(insert-file file)
+		(insert-file-contents file)
 		(->> (read (buffer-string))
 		     cframe-persistent-unpersist))))
     (oset mng :file file)
