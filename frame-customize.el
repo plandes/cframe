@@ -116,7 +116,7 @@ Super class for objects that want to persist to the file system.")
 (cl-defmethod cframe-persistable-save ((this cframe-persistable))
   "Persist manager and compiler configuration."
   (with-slots (file) this
-    (let ((class-name (->> (cframe-setting) eieio-object-class class-name))
+    (let ((class-name (->> this eieio-object-class class-name))
 	  (state (cframe-persistent-persist this)))
       (with-temp-buffer
 	(insert (format "\
@@ -383,10 +383,12 @@ This modifies the frame settings."
   "Restore the state of all custom frame settings."
   (interactive)
   (let* ((file (expand-file-name "cframe" user-emacs-directory))
-	 (mng (with-temp-buffer
-		(insert-file-contents file)
-		(->> (read (buffer-string))
-		     cframe-persistent-unpersist))))
+	 (mng (if (file-exists-p file)
+		  (with-temp-buffer
+		    (insert-file-contents file)
+		    (->> (read (buffer-string))
+			 cframe-persistent-unpersist))
+		(cframe-reset))))
     (oset mng :file file)
     (setq the-cframe-manager mng)
     (cframe-manager-advance-display mng)
