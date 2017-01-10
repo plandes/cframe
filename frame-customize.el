@@ -35,13 +35,30 @@
 ;;; Code:
 
 (require 'eieio)
-(require 'eieio-base)
+;(require 'eieio-base)
 (require 'time-stamp)
 (require 'dash)
 (require 'noflet)
 
+;; EIEIO list types can't unpersist as they produce this error:
+;;   eieio-persistent-validate/fix-slot-value: In save file, list of object
+;;   constructors found, but no :type specified for slot displays of type nil
+(defclass cframe-persistent ()
+  ((slots :initarg :slots
+	  :initform nil
+	  :type list))
+  :documentation "\
+Super class for objects that want to persist to the file system.")
+
+(cl-defmethod cframe-persistent-persist ((this cframe-persistent))
+  "Persist an object"
+  (with-slots (slots) this
+    (->> slots
+	 (-map #'(lambda (slot)
+		   (cons slot (slot-value this slot)))))))
+
 
-(defclass cframe-setting ()
+(defclass cframe-setting (cframe-persistent)
   ((name :initarg :name
 	 :initform "narrow"
 	 :type string)
@@ -96,6 +113,8 @@
 (cl-defmethod initialize-instance ((this cframe-setting) &rest rest)
   (cframe-setting-save this)
   (cframe-setting-set-name this)
+  (with-slots (slots) this
+    (setq slots '(name width height position)))
   (apply #'cl-call-next-method this rest))
 
 
@@ -105,7 +124,7 @@
   (cons (display-pixel-height)
 	(display-pixel-width)))
 
-(defclass cframe-display ()
+(defclass cframe-display (cframe-persistent)
   ((name :initarg :name
 	 :initform "untitled"
 	 :type string
@@ -124,7 +143,7 @@
 	   :documentation "Index of current setting."))
   :documentation "Represents a monitor display.")
 
-(defun cframe-insert-at-position (seq elt pos)
+(defun cframe-display-insert-at-position (seq elt pos)
   "Return SEQ with ELT inserted at position POS."
   (append (subseq seq 0 pos)
 	  (list elt)
@@ -135,7 +154,7 @@
   "Add and optionally create first a new setting if SETTING is nil."
   (with-slots (settings sindex) this
     (setq settings
-	  (cframe-insert-at-position settings
+	  (cframe-display-insert-at-position settings
 				     (or setting (cframe-setting))
 				     sindex))
     (incf sindex)))
@@ -154,17 +173,49 @@
 	    name id (length settings) sindex)))
 
 (cl-defmethod initialize-instance ((this cframe-display) &rest rest)
+  (with-slots (slots) this
+    (setq slots '(name id sindex)))
   (apply #'cl-call-next-method this rest)
   (cframe-display-set-name this))
 
+(cl-defmethod cframe-persistent-persist ((this cframe-display))
+  (with-slots (settings) this
+    (->> settings
+	 (-map #'(lambda (setting)
+		   (cframe-persistent-persist setting)))
+	 (cons 'settings)
+	 (append (cl-call-next-method this)))))
+
 
 
-(defclass cframe-manager (eieio-persistent)
+(defclass cframe-manager (cframe-persistent)
   ((displays :initarg :displays
 	     :initform nil;(list (cframe-display))
 	     :type list
 	     :documentation "Manages all displays."))
   :documentation "Manages displays.")
+
+(cl-defmethod cframe-persistent-save ((this cframe-persistent))
+  "Persist manager and compiler configuration."
+  (let ((fname compile-flex-persistency-file-name))
+    (with-temp-buffer
+      (insert
+       ";; -*- emacs-lisp -*-"
+       (condition-case nil
+	   (progn
+	     (format
+	      " <%s %s>\n"
+	      (time-stamp-string "%02y/%02m/%02d %02H:%02M:%02S")
+	      fname))
+	 (error "\n"))
+       ";; Frame Customize.  Don't change this file.\n"
+       (with-output-to-string
+	 ;; save manager configuration for future iterations
+	 (pp (append (list (cons 'manager nil))
+		     (list (cons 'compilers
+				 (flex-compile-manager-config this)))))))
+      (write-region (point-min) (point-max) fname)
+      (message "Wrote %s" compile-flex-persistency-file-name))))
 
 (cl-defmethod cframe-manager-file-header ((this cframe-manager))
   (with-temp-buffer
@@ -179,6 +230,12 @@
 (cl-defmethod object-write ((this cframe-manager) &optional comment)
   (cl-call-next-method this (or comment (oref this file-header-line))))
 
+;; (cl-defmethod initialize-instance ((this cframe-manager) &rest rest)
+;;   (with-slots (slots) this
+;;     (setq slots '(name id sindex)))
+;;   (apply #'cl-call-next-method this rest)
+;;   (cframe-display-set-name this))
+
 (cl-defmethod cframe-manager-display ((this cframe-manager)
 				      &optional no-create-p id)
   (with-slots (displays) this
@@ -192,10 +249,27 @@
 	      displays (append displays (list display))))
       display)))
 
-(cl-defmethod cframe-manager-setting-insert ((this cframe-manager)
+(cl-defmethod cframe-manager-insert-setting ((this cframe-manager)
 					     &optional setting)
   (-> (cframe-manager-display this)
       (cframe-display-insert-setting setting)))
+
+(cl-defmethod cframe-persistent-persist ((this cframe-manager))
+  (with-slots (displays) this
+    (->> displays
+	 (-map #'(lambda (setting)
+		   (cframe-persistent-persist setting)))
+	 (cons 'displays)
+	 (append (cl-call-next-method this)))))
+
+(defun a ()
+  (interactive)
+  (let ((this (cframe-manager)))
+    (cframe-manager-insert-setting this)
+    (->> (cframe-persistent-persist this)
+	 quote
+	 prettyprint)))
+
 
 
 
@@ -221,7 +295,7 @@
   "Add the current setting to the display."
   (interactive)
   (-> the-cframe-manager
-      cframe-manager-setting-insert)
+      cframe-manager-insert-setting)
   (cframe-save))
 
 (defun cframe-manager-reset ()
