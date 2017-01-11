@@ -226,7 +226,7 @@ Super class for objects that want to persist to the file system.")
   (with-slots (settings sindex) this
     (let ((slen (length settings)))
       (if (= 0 slen)
-	  (error "No settings exist--use `cframe-add-or-advance-display'"))
+	  (error "No settings exist--use `cframe-add-or-advance-setting'"))
      (-> (or index sindex)
 	 (mod slen)))))
 
@@ -235,8 +235,8 @@ Super class for objects that want to persist to the file system.")
     (->> (cframe-display-index this index)
 	 (setq sindex))))
 
-(cl-defmethod cframe-display-inc-index ((this cframe-display)
-					&optional num)
+(cl-defmethod cframe-display-increment-index ((this cframe-display)
+					      &optional num)
   (with-slots (sindex) this
     (cframe-display-set-index this (+ sindex (or num 1)))))
 
@@ -311,13 +311,15 @@ Super class for objects that want to persist to the file system.")
   (-> (cframe-manager-display this)
       (cframe-display-insert-setting setting)))
 
-(cl-defmethod cframe-manager-advance-display ((this cframe-manager))
+(cl-defmethod cframe-manager-advance-display ((this cframe-manager)
+					      &optional index)
   "Iterate the settings index in the current display and restore it.
 
 This modifies the frame settings."
   (let ((display (cframe-manager-display this)))
+    (if index (cframe-display-set-index display index))
     (cframe-display-setting-restore display)
-    (cframe-display-inc-index display)))
+    (cframe-display-increment-index display)))
 
 
 
@@ -355,7 +357,7 @@ This modifies the frame settings."
     (display-buffer (current-buffer))))
 
 ;;;###autoload
-(defun cframe-add-or-advance-display (addp)
+(defun cframe-add-or-advance-setting (addp)
   "Either add with ADDP the current frame setting advance the next."
   (interactive (list current-prefix-arg))
   (if addp
@@ -368,12 +370,22 @@ This modifies the frame settings."
 	cframe-manager-advance-display)))
 
 ;;;###autoload
+(defun cframe-set-index-and-advance-setting (index)
+  "Set the display's setting to INDEX and refresh the frame."
+  (interactive (list (or (if (consp current-prefix-arg)
+			     0
+			   current-prefix-arg) 
+			 0)))
+  (-> the-cframe-manager
+      (cframe-manager-advance-display index)))
+
+;;;###autoload
 (defun cframe-reset ()
   "Reset the state of the custom frame manager.
 
 This blows away all frame settings configuration in memory.  To
 wipe the state on the storage call `cframe-restore' or
-`cframe-add-or-advance-display' after calling this."
+`cframe-add-or-advance-setting' after calling this."
   (interactive)
   (setq the-cframe-manager
 	(cframe-manager :file cframe-persistency-file-name)))
