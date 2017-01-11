@@ -224,8 +224,11 @@ Super class for objects that want to persist to the file system.")
 
 (cl-defmethod cframe-display-index ((this cframe-display) &optional index)
   (with-slots (settings sindex) this
-    (-> (or index sindex)
-	(mod (length settings)))))
+    (let ((slen (length settings)))
+      (if (= 0 slen)
+	  (error "No settings exist--use `cframe-add-or-advance-display'"))
+     (-> (or index sindex)
+	 (mod slen)))))
 
 (cl-defmethod cframe-display-set-index ((this cframe-display) index)
   (with-slots (sindex) this
