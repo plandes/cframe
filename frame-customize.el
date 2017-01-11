@@ -181,7 +181,7 @@ Super class for objects that want to persist to the file system.")
 (cl-defmethod object-format ((this cframe-setting))
   (with-slots (name width height position) this
     (format "%s: [top: %d, left: %d, width: %d, height: %d]"
-	    name width height (car position) (cdr position))))
+	    name (car position) (cdr position) width height)))
 
 (cl-defmethod initialize-instance ((this cframe-setting) &rest rest)
   (cframe-setting-save this)
@@ -342,6 +342,16 @@ This modifies the frame settings."
   "The singleton manager instance.")
 
 ;;;###autoload
+(defun cframe-current-setting ()
+  "Get the current frame setting."
+  (interactive)
+  (let* ((display (-> the-cframe-manager
+		      cframe-manager-display))
+	 (setting (cframe-display-setting display)))
+    (->> (mapconcat #'object-format (list display setting) ", ")
+	 message)))
+
+;;;###autoload
 (defun cframe-display-list ()
   "Display a list of displays and their settings."
   (interactive)
@@ -367,17 +377,19 @@ This modifies the frame settings."
 	(cframe-save)
 	(message "Added setting and saved"))
     (-> the-cframe-manager
-	cframe-manager-advance-display)))
+	cframe-manager-advance-display))
+  (cframe-current-setting))
 
 ;;;###autoload
 (defun cframe-set-index-and-advance-setting (index)
   "Set the display's setting to INDEX and refresh the frame."
   (interactive (list (or (if (consp current-prefix-arg)
 			     0
-			   current-prefix-arg) 
+			   current-prefix-arg)
 			 0)))
   (-> the-cframe-manager
-      (cframe-manager-advance-display index)))
+      (cframe-manager-advance-display index))
+  (cframe-current-setting))
 
 ;;;###autoload
 (defun cframe-reset ()
