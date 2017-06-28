@@ -50,6 +50,11 @@
   :documentation "\
 Super class for objects that want to persist to the file system.")
 
+(defvar cframe-settings-restore-hooks nil
+  "Functions to call with `cframae-settings-restore' is called.
+When hook functions are called `setting' is bound to an instance
+of `cframe-settings'.")
+
 (cl-defmethod cframe-persistent-persist-value ((this cframe-persistent) val)
   (or (and (consp val)
 	   (or (let ((fval (car val)))
@@ -167,7 +172,9 @@ Super class for objects that want to persist to the file system.")
     (with-slots (name width height position) this
       (set-frame-width frame width)
       (set-frame-height frame height)
-      (set-frame-position frame (car position) (cdr position)))))
+      (set-frame-position frame (car position) (cdr position)))
+    (let ((setting this))
+      (run-hooks 'cframe-settings-restore-hooks))))
 
 (cl-defmethod cframe-setting-set-name ((this cframe-setting)
 				       &optional new-name)
