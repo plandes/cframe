@@ -234,8 +234,8 @@ of `cframe-settings'.")
     (let ((slen (length settings)))
       (if (= 0 slen)
 	  (error "No settings exist--use `cframe-add-or-advance-setting'"))
-     (-> (or index sindex)
-	 (mod slen)))))
+      (-> (or index sindex)
+	  (mod slen)))))
 
 (cl-defmethod cframe-display-set-index ((this cframe-display) index)
   (with-slots (sindex) this
@@ -325,8 +325,8 @@ of `cframe-settings'.")
 This modifies the frame settings."
   (let ((display (cframe-manager-display this)))
     (if index (cframe-display-set-index display index))
-    (cframe-display-setting-restore display)
-    (cframe-display-increment-index display)))
+    (cframe-display-increment-index display)
+    (cframe-display-setting-restore display)))
 
 
 
@@ -355,8 +355,7 @@ This modifies the frame settings."
   (let* ((display (-> the-cframe-manager
 		      cframe-manager-display))
 	 (setting (cframe-display-setting display)))
-    (->> (mapconcat #'object-format (list display setting) ", ")
-	 message)))
+    (-> setting object-format message)))
 
 ;;;###autoload
 (defun cframe-display-list ()
