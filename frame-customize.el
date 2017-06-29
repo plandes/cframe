@@ -365,13 +365,19 @@ This modifies the frame settings."
   "The singleton manager instance.")
 
 ;;;###autoload
-(defun cframe-current-setting ()
-  "Get the current frame setting."
-  (interactive)
+(defun cframe-current-setting (&optional include-display-p)
+  "Get the current frame setting.
+
+If INCLUDE-DISPLAY-P is non-nil, or provided interactively with
+\\[universal-argument]]."
+  (interactive "P")
   (let* ((display (-> the-cframe-manager
 		      cframe-manager-display))
 	 (setting (cframe-display-setting display)))
-    (-> setting object-format message)))
+    (-> (if include-display-p
+	    (concat (object-format display) ", "))
+	(concat (object-format setting))
+	message)))
 
 ;;;###autoload
 (defun cframe-display-list ()
@@ -444,7 +450,7 @@ wipe the state on the storage call `cframe-restore' or
 		(cframe-reset))))
     (oset mng :file file)
     (setq the-cframe-manager mng)
-    (cframe-manager-advance-display mng)
+    (cframe-manager-advance-display mng 0 0)
     mng))
 
 (provide 'frame-customize)
