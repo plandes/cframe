@@ -60,7 +60,7 @@ of `cframe-settings'.")
 	   (or (let ((fval (car val)))
 		 (and fval
 		      (eieio-object-p fval)
-		      (object-of-class-p fval cframe-persistent)
+		      (object-of-class-p fval 'cframe-persistent)
 		      (-map (lambda (val)
 			      (cframe-persistent-persist val))
 			    val)))))
@@ -306,10 +306,11 @@ of `cframe-settings'.")
   "Get display with index ID.
 If the dipslay doesn't exist create a new display if NO-CREATE-P is non-nil."
   (with-slots (displays) this
-    (let* ((id (or id (cframe-display-id)))
+    (let* ((find-id (or id (cframe-display-id)))
 	   (display (->> displays
 			 (cl-remove-if (lambda (display)
-					 (not (equal id (oref display :id)))))
+					 (with-slots (id) display
+					   (not (equal find-id id)))))
 			 car)))
       (when (and (null display) (not no-create-p))
 	(setq display (cframe-display)
