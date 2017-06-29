@@ -178,7 +178,7 @@ of `cframe-settings'.")
 
 (cl-defmethod cframe-setting-set-name ((this cframe-setting)
 				       &optional new-name)
-  "Set the name of the setting."
+  "Set the name of the `cframe-setting'."
   (with-slots (name width) this
     (let ((new-name (or new-name (cond ((<= width 80) "narrow")
 				       ((<= width 140) "wide")
@@ -230,6 +230,10 @@ of `cframe-settings'.")
 	  (cl-subseq seq pos)))
 
 (cl-defmethod cframe-display-index ((this cframe-display) &optional index)
+  "Get the `cframe-setting' (`sindex' slot) index.
+
+If INDEX is given, disregard the `sindex' slot and adjust (mod
+it) to the cardinality of the settings."
   (with-slots (settings sindex) this
     (let ((slen (length settings)))
       (if (= 0 slen)
@@ -238,6 +242,9 @@ of `cframe-settings'.")
 	  (mod slen)))))
 
 (cl-defmethod cframe-display-set-index ((this cframe-display) index)
+  "Get the `cframe-setting' (`sindex' slot) index.
+
+See `cframe-display-index'."
   (with-slots (sindex) this
     (->> (cframe-display-index this index)
 	 (setq sindex))))
@@ -249,6 +256,7 @@ of `cframe-settings'.")
     (cframe-display-set-index this (+ sindex (or num 1)))))
 
 (cl-defmethod cframe-display-setting ((this cframe-display) &optional index)
+  "Get the `cframe-setting' by INDEX."
   (with-slots (settings) this
     (nth (cframe-display-index this index) settings)))
 
@@ -264,7 +272,7 @@ of `cframe-settings'.")
 
 (cl-defmethod cframe-display-set-name ((this cframe-display)
 				       &optional new-name)
-  "Set the name of the display."
+  "Set the name of this `cframe-display' to NEW-NAME."
   (with-slots (name id) this
     (let ((new-name (or new-name
 			(format "(%d X %d)" (car id) (cdr id)))))
@@ -272,6 +280,7 @@ of `cframe-settings'.")
 
 (cl-defmethod cframe-display-setting-restore ((this cframe-display)
 					      &optional setting)
+  "Restore this `cframe-display' and contained `cframe-setting' instances."
   (let ((setting (or setting (cframe-display-setting this))))
     (cframe-setting-restore setting)))
 
