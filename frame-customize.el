@@ -61,8 +61,8 @@ of `cframe-settings'.")
 		 (and fval
 		      (eieio-object-p fval)
 		      (object-of-class-p fval cframe-persistent)
-		      (-map #'(lambda (val)
-				(cframe-persistent-persist val))
+		      (-map (lambda (val)
+			      (cframe-persistent-persist val))
 			    val)))))
       val))
 
@@ -70,10 +70,10 @@ of `cframe-settings'.")
   "Persist the slots of the instance."
   (with-slots (slots) this
     (->> slots
-	 (-map #'(lambda (slot)
-		   (let ((val (->> (slot-value this slot)
-				   (cframe-persistent-persist-value this))))
-		     (cons slot val)))))))
+	 (-map (lambda (slot)
+		 (let ((val (->> (slot-value this slot)
+				 (cframe-persistent-persist-value this))))
+		   (cons slot val)))))))
 
 (cl-defmethod cframe-persistent-persist ((this cframe-persistent))
   "Persist an object."
@@ -89,8 +89,8 @@ of `cframe-settings'.")
 		 (and (consp fval)
 		      (consp (car fval))
 		      (eq 'class (caar fval))
-		      (-map #'(lambda (val)
-				(cframe-persistent-unpersist val))
+		      (-map (lambda (val)
+			      (cframe-persistent-unpersist val))
 			    val)))))
       val))
 
@@ -98,10 +98,10 @@ of `cframe-settings'.")
   "Persist an object."
   (with-slots (slots) this
     (->> slots
-	 (-map #'(lambda (slot)
-		   (let ((val (->> (cdr (assq slot vals))
-				   (cframe-persistent-unpersist-value this))))
-		     (setf (slot-value this slot) val)))))))
+	 (-map (lambda (slot)
+		 (let ((val (->> (cdr (assq slot vals))
+				 (cframe-persistent-unpersist-value this))))
+		   (setf (slot-value this slot) val)))))))
 
 (cl-defmethod cframe-persistent-unpersist ((vals list))
   (let* ((class (cdr (assq 'class vals)))
@@ -121,7 +121,7 @@ of `cframe-settings'.")
 (cl-defmethod cframe-persistable-save ((this cframe-persistable))
   "Persist manager and compiler configuration."
   (with-slots (file) this
-    (let ((save-class-name (->> this eieio-object-class class-name))
+    (let ((save-class-name (->> this eieio-object-class eieio-class-name))
 	  (state (cframe-persistent-persist this)))
       (with-temp-buffer
 	(insert (format "\
@@ -244,6 +244,7 @@ of `cframe-settings'.")
 
 (cl-defmethod cframe-display-increment-index ((this cframe-display)
 					      &optional num)
+  "Increment the display index by NUM positions, which defaults to 1."
   (with-slots (sindex) this
     (cframe-display-set-index this (+ sindex (or num 1)))))
 
@@ -302,11 +303,13 @@ of `cframe-settings'.")
 
 (cl-defmethod cframe-manager-display ((this cframe-manager)
 				      &optional no-create-p id)
+  "Get display with index ID.
+If the dipslay doesn't exist create a new display if NO-CREATE-P is non-nil."
   (with-slots (displays) this
     (let* ((id (or id (cframe-display-id)))
 	   (display (->> displays
-			 (cl-remove-if #'(lambda (display)
-					   (not (equal id (oref display :id)))))
+			 (cl-remove-if (lambda (display)
+					 (not (equal id (oref display :id)))))
 			 car)))
       (when (and (null display) (not no-create-p))
 	(setq display (cframe-display)
@@ -319,13 +322,16 @@ of `cframe-settings'.")
       (cframe-display-insert-setting setting)))
 
 (cl-defmethod cframe-manager-advance-display ((this cframe-manager)
-					      &optional index)
+					      &optional index num)
   "Iterate the settings index in the current display and restore it.
 
+This increments the display index by NUM positions, which defaults to 1.
+
 This modifies the frame settings."
-  (let ((display (cframe-manager-display this)))
+  (let ((display (cframe-manager-display this))
+	(num (or num 1)))
     (if index (cframe-display-set-index display index))
-    (cframe-display-increment-index display)
+    (cframe-display-increment-index display num)
     (cframe-display-setting-restore display)))
 
 
@@ -340,10 +346,10 @@ This modifies the frame settings."
   "File containing the Flex compile configuration data."
   :type 'file
   :group 'cframe
-  :set #'(lambda (sym val)
-	   (set-default sym val)
-	   (if (boundp 'the-cframe-manager)
-	       (oset the-cframe-manager :file val))))
+  :set (lambda (sym val)
+	 (set-default sym val)
+	 (if (boundp 'the-cframe-manager)
+	     (oset the-cframe-manager :file val))))
 
 (defvar the-cframe-manager nil
   "The singleton manager instance.")
@@ -387,14 +393,14 @@ This modifies the frame settings."
   (cframe-current-setting))
 
 ;;;###autoload
-(defun cframe-set-index-and-advance-setting (index)
+(defun cframe-set-index-setting (index)
   "Set the display's setting to INDEX and refresh the frame."
   (interactive (list (or (if (consp current-prefix-arg)
 			     0
 			   current-prefix-arg)
 			 0)))
   (-> the-cframe-manager
-      (cframe-manager-advance-display index))
+      (cframe-manager-advance-display index 0))
   (cframe-current-setting))
 
 ;;;###autoload
