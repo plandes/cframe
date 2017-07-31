@@ -130,6 +130,11 @@ Super class for objects that want to persist to the file system.")
 	 :initform nil
 	 :type (or null string)
 	 :protection :protected)
+   (description :initarg :description
+		:initform "<none>"
+		:type string
+		:documentation "
+The description of this entry, used in `config-manager-list-entries-buffer'.")
    (manager :initarg :manager
 	    :initform nil
 	    :protection :protected))
@@ -138,8 +143,11 @@ Super class for objects that want to persist to the file system.")
 
 (cl-defmethod config-entry-name ((this config-entry))
   "Get the name of the configuration entry."
-  (error "No implementation of `config-entry-name' for class `%S'"
-	 (eieio-object-class this)))
+  (oref this :name))
+
+(cl-defmethod config-entry-description ((this config-entry))
+  "Get the description of the configuration entry."
+  (oref this :description))
 
 (cl-defmethod config-entry-save ((this config-entry))
   "Save the current entry configuration."
@@ -194,10 +202,6 @@ Used for history when reading user input when switching to other buffers.")
 Keeps track of the last entry for last-visit cycle method."))
   :documentation "Manages configurations.")
 
-(defconst config-manager-list-header-fields
-  '("C" "Name"  "Working Directory")
-  "*List of fields used in output of `buffer-list'.")
-
 (defconst config-manager-list-col-space 4
   "Space between columns.")
 
@@ -220,6 +224,10 @@ Keeps track of the last entry for last-visit cycle method."))
 (cl-defmethod config-manager-entry-default-name ((this config-manager))
   (error "No implementation of `config-manager-entry-default-name' for class `%S'"
 	 (eieio-object-class this)))
+
+(cl-defmethod config-manager-list-header-fields ((this config-manager))
+  "*List of fields used in output of `buffer-list'."
+  '("C" "Name"  "Description"))
 
 (cl-defmethod config-manager-index ((this config-manager) &optional index)
   "Get the `config-entry' (`entry-index' slot) index.
@@ -278,6 +286,10 @@ See `config-manager-index'."
 (cl-defmethod config-manager-entries ((this config-manager))
   (oref this :entries))
 
+(cl-defmethod config-manager-switch ((this config-manager))
+  (error "No implementation of `config-manager-switch' for class `%S'"
+	 (eieio-object-class this)))
+
 (cl-defmethod config-manager-cycle-methods ((this config-manager))
   "All valid cycle methods (see `config-manager-entry-cycle')."
   '(last-visit next))
@@ -307,7 +319,7 @@ See `config-manager-index'."
 				 (get-entries))))))
 	     (get-wd
 	      (entry col-space name-len)
-	      (let* ((name (config-entry-name entry))
+	      (let* ((name (config-entry-description entry))
 		     (len (length name))
 		     (width 79)
 		     (max-len (- (- width col-space) name-len 0)))
@@ -325,7 +337,7 @@ See `config-manager-index'."
 	  (col-space config-manager-list-col-space))
       (setq name-len (or name-len col-space))
       (let ((entries (get-entries))
-	    (headers config-manager-list-header-fields)
+	    (headers (config-manager-list-header-fields this))
 	    format-meta)
 	(setq format-meta (format "%%-%ds %%-%ds%%s"
 				  col-space (+ col-space name-len)))
@@ -408,9 +420,9 @@ BUFFER-NAME is the name of the buffer holding the entries for the mode."
   '((t (:foreground "darkcyan")))
   "Font Lock mode face used to highlight buffer names."
   :group 'config-manage-font-lock-faces)
-(defface config-manage-font-lock-wd-face
+(defface config-manage-font-lock-desc-face
   '((t (:foreground "blue")))
-  "Font Lock mode face used to highlight working directories."
+  "Font Lock mode face used to highlight description."
   :group 'config-manage-font-lock-faces)
 
 ;; font variables
@@ -420,17 +432,17 @@ BUFFER-NAME is the name of the buffer holding the entries for the mode."
 (defvar config-manage-font-lock-name-face
   'config-manage-font-lock-name-face
   "Face name to use for names.")
-(defvar config-manage-font-lock-wd-face
-  'config-manage-font-lock-wd-face
+(defvar config-manage-font-lock-desc-face
+  'config-manage-font-lock-desc-face
   "Face name to use for working directories.")
 
 (defvar config-manage-font-lock-keywords
   `((,(format "^.\\{%d\\}\\(.*?\\)[ \t]+.*$" (1+ config-manager-list-col-space))
      1 config-manage-font-lock-name-face t)
     (,(format "^.\\{%d\\}.*?[ \t]+\\(.*\\)$" (1+ config-manager-list-col-space))
-     1 config-manage-font-lock-wd-face t)
-    ,(list (format "^\\(%s.*\\)$" (cl-second config-manager-list-header-fields))
-	   1 config-manage-font-lock-headers-face t)
+     1 config-manage-font-lock-desc-face t)
+    ;; ,(list (format "^\\(%s.*\\)$" (cl-second config-manager-list-header-fields))
+    ;; 	   1 config-manage-font-lock-headers-face t)
     ("^\\([- \t]+\\)$" 1 config-manage-font-lock-headers-face t))
   "Additional expressions to highlight in buffer manage mode.")
 

@@ -10,11 +10,7 @@ When hook functions are called `setting' is bound to an instance
 of `cframe-settings'.")
 
 (defclass tframe-setting (config-entry)
-  (
-   ;; (name :initarg :name
-   ;; 	 :initform "narrow"
-   ;; 	 :type string)
-   (width :initarg :width
+  ((width :initarg :width
 	  :initform 80
 	  :type integer
 	  :documentation "Width of the frame.")
@@ -28,12 +24,14 @@ of `cframe-settings'.")
 	     :documentation "Top/left position of the frame."))
   :documentation "A frame settings: size and location.")
 
-(cl-defmethod config-entry-name ((this tframe-setting))
-  (oref this :name))
-
 (cl-defmethod tframe-setting-frame ((this tframe-setting))
   "Return the setting's frame."
   (selected-frame))
+
+(cl-defmethod config-entry-description ((this config-entry))
+  "Get the description of the configuration entry."
+  (with-slots (width height) this
+    (format "w: %d, h: %d" width height)))
 
 (cl-defmethod config-entry-save ((this tframe-setting))
   "Save the current frame configuration."
@@ -70,7 +68,7 @@ of `cframe-settings'.")
 (cl-defmethod initialize-instance ((this tframe-setting) &rest rest)
   (config-entry-save this)
   (tframe-setting-set-name this)
-  (with-slots (slots) this
+  (with-slots (slots description width height) this
     (setq slots '(name width height position)))
   (apply #'cl-call-next-method this rest))
 
@@ -88,18 +86,16 @@ of `cframe-settings'.")
        :documentation "Identifies this display."))
   :documentation "Represents a monitor display.")
 
+(cl-defmethod config-manager-list-header-fields ((this tframe-display))
+  "*List of fields used in output of `buffer-list'."
+  '("C" "Name"  "Dimensions"))
+
 (cl-defmethod config-manager-entry-default-name ((this tframe-display))
   (with-slots (id) this
     (format "(%d X %d)" (car id) (cdr id))))
 
 (cl-defmethod config-manager-create-default ((this tframe-display))
   (tframe-setting))
-
-;; (cl-defmethod cframe-display-setting-restore ((this cframe-display)
-;; 					      &optional setting)
-;;   "Restore this `cframe-display' and contained `cframe-setting' instances."
-;;   (let ((setting (or setting (cframe-display-setting this))))
-;;     (cframe-setting-restore setting)))
 
 (cl-defmethod object-format ((this tframe-display))
   (with-slots (name id entries entry-index) this
@@ -121,11 +117,6 @@ of `cframe-settings'.")
 	     :type list
 	     :documentation "Displays that have settings."))
   :documentation "Manages displays.")
-
-(cl-defmethod initialize-instance ((this tframe-manager) &rest rest)
-  (with-slots (slots) this
-    (setq slots '(displays file)))
-  (apply #'cl-call-next-method this rest))
 
 (cl-defmethod tframe-manager-display ((this tframe-manager)
 				      &optional no-create-p id)
@@ -155,6 +146,11 @@ This modifies the frame settings."
     (if index (config-manager-set-index display index))
     (config-manager-increment-index display num)
     (config-manager-entry-restore display)))
+
+(cl-defmethod initialize-instance ((this tframe-manager) &rest rest)
+  (with-slots (slots) this
+    (setq slots '(displays file)))
+  (apply #'cl-call-next-method this rest))
 
 
 ;; funcs
@@ -252,29 +248,12 @@ wipe the state on the storage call `tframe-restore' or
     (tframe-manager-advance-display mng 0 0)
     mng))
 
-
-
-(defun a ()
-  (interactive)
-  (let ((dis (tframe-display)))
-    (config-manager-insert-entry dis)
-    ;(config-manager-list-entries-buffer dis "Tmp")
-    )
-  (tframe-restore)
-  ;(tframe-add-or-advance-setting t)
-  )
-
-;(tframe-add-or-advance-setting nil)
+;(tframe-restore)
 
 (defun a ()
   (interactive)
-  (let ((dis (tframe-display)))
-    (config-manager-insert-entry dis))
-  (tframe-restore)
   (-> the-tframe-manager
       (tframe-manager-display t)
-      (config-manager-list-entries-buffer "Tmp")
-      ;(oref :entries)
-      ;(oref :entries) length
-      ;(config-manager-entries) length
-      ))
+      (config-manager-list-entries-buffer "Tmp")))
+
+;(tframe-add-or-advance-setting t)
