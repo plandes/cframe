@@ -129,7 +129,9 @@ Super class for objects that want to persist to the file system.")
   ((name :initarg :name
 	 :initform nil
 	 :type (or null string)
-	 :protection :protected)
+	 :reader config-entry-name
+	 :writer config-entry-set-name
+ 	 :protection :protected)
    (description :initarg :description
 		:initform "<none>"
 		:type string
@@ -140,10 +142,6 @@ The description of this entry, used in `config-manager-list-entries-buffer'.")
 	    :protection :protected))
   :abstract true
   :documentation "Abstract class for all configurable entries.")
-
-(cl-defmethod config-entry-name ((this config-entry))
-  "Get the name of the configuration entry."
-  (oref this :name))
 
 (cl-defmethod config-entry-description ((this config-entry))
   "Get the description of the configuration entry."
@@ -260,16 +258,48 @@ See `config-manager-index'."
   (with-slots (entries) this
     (nth (config-manager-index this index) entries)))
 
+(defun config-manager-iterate-name (name names)
+  "Create a unique NAME from existing NAMES by iterating FORM<N> integer.
+
+N is an integer.
+
+This is the typical unique name (buffers, files etc) creation."
+  (->> names
+       (-map (lambda (elt)
+	       (if (string-match (concat name "\\(?:<\\([0-9]+\\)>\\)?$") elt)
+		   (let ((expr (match-string 1 elt)))
+		     (or (and expr (read expr))
+			 0)))))
+       (-filter #'identity)
+       (cons -1)
+       (reduce #'max)
+       (funcall (lambda (elt)
+		  (if (> elt -1)
+		      (concat name "<" (-> elt incf prin1-to-string) ">")
+		    name)))))
+
+(let ((this a)
+      (name "narrow"))
+  (with-slots (entries) this
+    (->> entries
+	 (-map (lambda (elt)
+		 (config-entry-name elt)))
+	 (config-manager-iterate-name name))))
+
 (cl-defmethod config-manager-insert-entry ((this config-manager)
 					   &optional entry)
   "Add and optionally create first a new entry if ENTRY is nil."
-  (with-slots (entries entry-index) this
-    (setq entries
-	  (config-manager-insert-at-position
-	   entries
-	   (or entry (config-manager-create-default this))
-	   entry-index))
-    (cl-incf entry-index)))
+  (let* ((entry (or entry (config-manager-create-default this)))
+	 (name (config-entry-name entry)))
+    (with-slots (entries entry-index) this
+      (->> entries
+	   (-map (lambda (elt)
+		   (config-entry-name elt)))
+	   (config-manager-iterate-name name)
+	   (config-entry-set-name entry))
+      (setq entries
+	    (config-manager-insert-at-position entries entry entry-index))
+      (cl-incf entry-index))))
 
 (cl-defmethod config-manager-set-name ((this config-manager) &optional new-name)
   "Set the name of this `config-manager' to NEW-NAME."
