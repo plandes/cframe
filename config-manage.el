@@ -162,9 +162,11 @@ The description of this entry, used in `config-manager-list-entries-buffer'.")
     name))
 
 
+
 (defclass config-manager (config-persistent)
   ((name :initarg :name
 	 :initform "untitled"
+	 :reader config-manager-name
 	 :type string
 	 :documentation "Name of this configuration manager.")
    (cycle-method :initarg :cycle-method
@@ -189,13 +191,18 @@ This parameter is used as the default for `criteria' \(see
 		:initform 0
 		:type integer
 		:documentation "Index of current entry.")
+   (list-header-fields :initarg :list-header-fields
+		       :initform '("C" "Name"  "Description")
+		       :type list
+		       :documentation "\
+List of fields used in output of `buffer-list'.")
    (read-history :initform nil
 		 :protection :private
 		 :documentation "\
 Used for history when reading user input when switching to other buffers.")
    ;; careful: this slot keeps stale entries after they've been removed/killed
    (last-switched-to :initform nil
-		     :protection :private
+		     ;:protection :private
 		     :documentation "\
 Keeps track of the last entry for last-visit cycle method."))
   :documentation "Manages configurations.")
@@ -223,10 +230,6 @@ Keeps track of the last entry for last-visit cycle method."))
   (error "No implementation of `config-manager-entry-default-name' for class `%S'"
 	 (eieio-object-class this)))
 
-(cl-defmethod config-manager-list-header-fields ((this config-manager))
-  "*List of fields used in output of `buffer-list'."
-  '("C" "Name"  "Description"))
-
 (cl-defmethod config-manager-index ((this config-manager) &optional index)
   "Get the `config-entry' (`entry-index' slot) index.
 
@@ -253,10 +256,92 @@ See `config-manager-index'."
   (with-slots (entry-index) this
     (config-manager-set-index this (+ entry-index (or num 1)))))
 
-(cl-defmethod config-manager-entry ((this config-manager) &optional index)
-  "Get the `config-entry' by INDEX."
+(cl-defmethod config-manager-cycle-entries ((this config-manager) entry)
+  "Rearrange the entry order to place ENTRY in place after cycling."
+  (with-slots (entries cycle-method) this
+    (let ((first (car entries)))
+      (setq entries (cons entry (remove entry entries)))
+      (if (and (eq 'next cycle-method)
+	       (> (length entries) 1)
+	       (not (eq first entry)))
+	  (setq entries (append (remove first entries) (list first)))))))
+
+(cl-defmethod config-manager-entry-exists-p ((this config-manager) entry)
+  "If ENTRY is an instance of a class or subclass of `buffer-entry' return it."
   (with-slots (entries) this
-    (nth (config-manager-index this index) entries)))
+    (and (eieio-object-p entry)
+	 (object-of-class-p entry 'config-entry)
+	 (member entry entries)
+	 entry)))
+
+(cl-defmethod config-manager-entry ((this config-manager)
+				    criteria &optional assertp)
+  "This returns an entry based on CRITERIA.
+CRITERIA is:
+  a string: the buffer name to switch to the buffer entry with that name
+  an integer: get it by index
+  a symbol: if `first', the highest priority buffer entry is selected,
+	    if `last' the last most priority buffer entry is selected,
+	    if `next' the next entry in the list or start back with the first
+	    if `cycle' the next (after the current) most desirable
+	    buffer entry is selected based on the value of slot `cycle-method'"
+  (let* ((entries (config-manager--entries this))
+	 (len (length entries))
+	 entry)
+    (setq entry
+	  (cond ((stringp criteria)
+		 (config-manager-first-entry
+		  this #'(lambda (entry)
+			   (string-equal criteria
+					 (buffer-entry-name entry)))))
+		((integerp criteria)
+		 (nth (config-manager-index this criteria) entries))
+		((config-manager-entry-exists-p this criteria))
+		((= len 0) nil)
+		((= len 1) (car entries))
+		((eq criteria 'first) (car entries))
+		((eq criteria 'last) (last entries))
+		;; TODO
+		((eq criteria 'cycle) (config-manager-entry-cycle this))
+		(t (error "Illegal argument for criteria: %S"
+			  criteria))))
+    (if (and assertp (null entry))
+	(error "No entry exists that satisfies criteria `%S'" criteria))
+    entry))
+
+(cl-defmethod config-manager-current-instance ((this config-manager))
+  (with-slots (last-switched-to) this
+   (or last-switched-to
+       (first (config-manager--entries this)))))
+
+(cl-defmethod config-manager-entry-cycle ((this config-manager))
+  "Return the next `cycled' entry based on slot `cycle-method'.
+The default uses:
+  last-visit: go to the last visited buffer entry
+	next: go to the next highest priority buffer entry"
+  (with-slots (last-switched-to cycle-method) this
+    (let ((entries (config-manager--entries this))
+	  ;; the current entry we're in (if there is one)
+	  (cur-entry (config-manager-current-instance this))
+	  (method cycle-method))
+      (if (not (member method (config-manager-cycle-methods this)))
+	  (error "Invalid cycle method: %S" method))
+      (or
+       ;; only can switch to one if there is one
+       (if (= (length entries) 1) (car entries))
+       ;; try to use the last entry that was switched into if we can
+       (if (and last-switched-to
+		;; don't pick the one we are in or we won't switch at all
+		(not cur-entry))
+	   last-switched-to)
+       (let ((bak-entries (copy-tree entries)))
+	 (or
+	  (cl-case method
+	    (last-visit (cl-second entries))
+	    (next (cl-second entries))
+	    (otherwise (error "Unimplemented (but value) cycle method: %S"
+			      method)))
+	  (car entries)))))))
 
 (defun config-manager-iterate-name (name names)
   "Create a unique NAME from existing NAMES by iterating FORM<N> integer.
@@ -277,14 +362,6 @@ This is the typical unique name (buffers, files etc) creation."
 		  (if (> elt -1)
 		      (concat name "<" (-> elt incf prin1-to-string) ">")
 		    name)))))
-
-(let ((this a)
-      (name "narrow"))
-  (with-slots (entries) this
-    (->> entries
-	 (-map (lambda (elt)
-		 (config-entry-name elt)))
-	 (config-manager-iterate-name name))))
 
 (cl-defmethod config-manager-insert-entry ((this config-manager)
 					   &optional entry)
@@ -310,19 +387,33 @@ This is the typical unique name (buffers, files etc) creation."
 (cl-defmethod config-manager-entry-restore ((this config-manager)
 					    &optional entry)
   "Restore this `config-manager' and contained `config-entry' instances."
-  (let ((entry (or entry (config-manager-entry this))))
+  (let ((entry (or entry (config-manager-entry this 0))))
     (config-entry-restore entry)))
 
-(cl-defmethod config-manager-entries ((this config-manager))
+(cl-defmethod config-manager--entries ((this config-manager))
   (oref this :entries))
 
-(cl-defmethod config-manager-switch ((this config-manager))
-  (error "No implementation of `config-manager-switch' for class `%S'"
-	 (eieio-object-class this)))
+(cl-defmethod config-manager-switch ((this config-manager) criteria)
+  "Switch to a config entry.
+
+If the config CRITERIA is the name of the config to switch to, go to that
+config, otherwise, create a new one with that name and switch to it.
+Returns the config entry we switched to based on CRITERIA \(see
+`config-manager-entry')."
+  (let ((entry (or (config-manager-entry this criteria)
+		   (config-manager-new-entry
+		    this (and (stringp criteria) criteria)))))
+    (config-entry-restore entry)
+    (config-manager-cycle-entries this entry)
+    entry))
 
 (cl-defmethod config-manager-cycle-methods ((this config-manager))
   "All valid cycle methods (see `config-manager-entry-cycle')."
   '(last-visit next))
+
+;; (cl-defmethod config-manager-entry-cycle ((this config-manager))
+;;   (error "No implementation of `config-manager-entry-cycle' for class `%S'"
+;; 	 (eieio-object-class this)))
 
 (cl-defmethod config-manager-toggle-cycle-method ((this config-manager))
   (let* ((methods (config-manager-cycle-methods this))
@@ -335,7 +426,7 @@ This is the typical unique name (buffers, files etc) creation."
   "Return a multi-listing of the buffer entries contained in this manager."
   (cl-flet* ((get-entries
 	      ()
-	      (sort (copy-tree (config-manager-entries this))
+	      (sort (copy-tree (config-manager--entries this))
 		    #'(lambda (a b)
 			(string< (config-entry-name a)
 				 (config-entry-name b)))))
@@ -344,10 +435,10 @@ This is the typical unique name (buffers, files etc) creation."
 	      (let ((entries (get-entries)))
 		(when entries
 		  (apply #'max
-			 (mapcar #'(lambda (entry)
-				     (length (funcall getter-fn entry)))
-				 (get-entries))))))
-	     (get-wd
+			 (mapcar (lambda (entry)
+				   (length (funcall getter-fn entry)))
+				 entries)))))
+	     (get-desc
 	      (entry col-space name-len)
 	      (let* ((name (config-entry-description entry))
 		     (len (length name))
@@ -359,7 +450,7 @@ This is the typical unique name (buffers, files etc) creation."
     (when (not (boundp 'config-entry-status))
       (set (make-local-variable 'config-entry-status)
 	   (make-hash-table :test 'equal)))
-    (dolist (entry (config-manager-entries this))
+    (dolist (entry (config-manager--entries this))
       (let ((name (config-entry-name entry)))
 	(unless (gethash name config-entry-status)
 	  (puthash name 'alive config-entry-status))))
@@ -367,7 +458,7 @@ This is the typical unique name (buffers, files etc) creation."
 	  (col-space config-manager-list-col-space))
       (setq name-len (or name-len col-space))
       (let ((entries (get-entries))
-	    (headers (config-manager-list-header-fields this))
+	    (headers (oref this list-header-fields))
 	    format-meta)
 	(setq format-meta (format "%%-%ds %%-%ds%%s"
 				  col-space (+ col-space name-len)))
@@ -389,13 +480,16 @@ This is the typical unique name (buffers, files etc) creation."
 	    (put-text-property 0 (length name) 'mouse-face 'highlight name)
 	    (insert (apply #'format format-meta
 			   (append (list status name
-					 (get-wd entry col-space name-len))))))
+					 (get-desc entry col-space name-len))))))
 	  (if (cdr lst) (insert "\n")))))))
 
-(cl-defmethod config-manager-list-entries-buffer ((this config-manager) buffer-name)
+(cl-defmethod config-manager-list-entries-buffer ((this config-manager)
+						  &optional buffer-name)
   "Create a listing of buffers used for viewing, renameing, deleting, adding.
 BUFFER-NAME is the name of the buffer holding the entries for the mode."
-  (let* ((buf (get-buffer buffer-name))
+  (let* ((buffer-name (or buffer-name (->> (config-manager-name this)
+					   (format "*%s*"))))
+	 (buf (get-buffer buffer-name))
 	 (newp (not buf))
 	 (buf (or buf (get-buffer-create buffer-name))))
     (save-excursion
@@ -423,7 +517,7 @@ BUFFER-NAME is the name of the buffer holding the entries for the mode."
 (cl-defmethod initialize-instance ((this config-manager) &rest rest)
   (with-slots (slots) this
     (setq slots
-	  (append slots '(name id entry-index entries))))
+	  (append slots '(name entry-index entries))))
   (apply #'cl-call-next-method this rest)
   (config-manager-set-name this))
 
@@ -471,8 +565,6 @@ BUFFER-NAME is the name of the buffer holding the entries for the mode."
      1 config-manage-font-lock-name-face t)
     (,(format "^.\\{%d\\}.*?[ \t]+\\(.*\\)$" (1+ config-manager-list-col-space))
      1 config-manage-font-lock-desc-face t)
-    ;; ,(list (format "^\\(%s.*\\)$" (cl-second config-manager-list-header-fields))
-    ;; 	   1 config-manage-font-lock-headers-face t)
     ("^\\([- \t]+\\)$" 1 config-manage-font-lock-headers-face t))
   "Additional expressions to highlight in buffer manage mode.")
 
@@ -545,7 +637,7 @@ EVENT mouse event data."
   (setq name (or name (config-manage-mode-name-at-point)))
   (let ((this config-manager-instance))
     (config-manage-mode-assert)
-    (config-manager-switch this name)))
+    (config-manager-switch this) name))
 
 (defun config-manage-mode-view (&optional name)
   "Activates the buffer entry with name NAME."

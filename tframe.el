@@ -86,16 +86,15 @@ of `cframe-settings'.")
        :documentation "Identifies this display."))
   :documentation "Represents a monitor display.")
 
-(cl-defmethod config-manager-list-header-fields ((this tframe-display))
-  "*List of fields used in output of `buffer-list'."
-  '("C" "Name"  "Dimensions"))
-
 (cl-defmethod config-manager-entry-default-name ((this tframe-display))
   (with-slots (id) this
     (format "(%d X %d)" (car id) (cdr id))))
 
 (cl-defmethod config-manager-create-default ((this tframe-display))
   (tframe-setting))
+
+;; (cl-defmethod config-manager-switch ((this tframe-display) name)
+;;   (config-manager-entry name))
 
 (cl-defmethod object-format ((this tframe-display))
   (with-slots (name id entries entry-index) this
@@ -104,9 +103,10 @@ of `cframe-settings'.")
 	    (tframe-display-index this))))
 
 (cl-defmethod initialize-instance ((this tframe-display) &rest rest)
-  (with-slots (slots) this
-    (setq slots
-	  (append slots '(id))))
+  (with-slots (slots list-header-fields cycle-method) this
+    (setq slots (append slots '(id))
+	  cycle-method 'next
+	  list-header-fields '("C" "Name" "Dimensions")))
   (apply #'cl-call-next-method this rest))
 
 
@@ -141,11 +141,17 @@ If the dipslay doesn't exist create a new display if NO-CREATE-P is non-nil."
 This increments the display index by NUM positions, which defaults to 1.
 
 This modifies the frame settings."
-  (let ((display (tframe-manager-display this))
-	(num (or num 1)))
-    (if index (config-manager-set-index display index))
-    (config-manager-increment-index display num)
-    (config-manager-entry-restore display)))
+  ;; (let ((display (tframe-manager-display this))
+  ;; 	(num (or num 1)))
+  ;;   (if index (config-manager-set-index display index))
+  ;;   (config-manager-increment-index display num)
+  ;;   (config-manager-entry-restore display)
+  ;;   num)
+  (let ((display (tframe-manager-display this)))
+    (config-manager-switch display 'cycle)))
+
+(cl-defmethod tframe-manager-clear-displays ((this tframe-manager))
+  (oset this :displays nil))
 
 (cl-defmethod initialize-instance ((this tframe-manager) &rest rest)
   (with-slots (slots) this
@@ -167,7 +173,8 @@ This modifies the frame settings."
   :group 'tframe
   :set (lambda (sym val)
 	 (set-default sym val)
-	 (if (boundp 'the-tframe-manager)
+	 (if (and (boundp 'the-tframe-manager)
+		  the-tframe-manager)
 	     (oset the-tframe-manager :file val))))
 
 (defvar the-tframe-manager nil
@@ -182,7 +189,8 @@ If INCLUDE-DISPLAY-P is non-nil, or provided interactively with
   (interactive "P")
   (let* ((display (-> the-tframe-manager
 		      tframe-manager-display))
-	 (setting (config-manager-entry display)))
+	 (idx (config-manager-index display))
+	 (setting (config-manager-entry display idx)))
     (-> (if include-display-p
 	    (concat (object-format display) ", "))
 	(concat (object-format setting))
@@ -226,6 +234,13 @@ wipe the state on the storage call `tframe-restore' or
 	(tframe-manager :file tframe-persistency-file-name)))
 
 ;;;###autoload
+(defun tframe-clear ()
+  "Remove all displays and start completely over \(careful!\)."
+  (interactive)
+  (-> the-tframe-manager
+      tframe-manager-clear-displays))
+
+;;;###autoload
 (defun tframe-save ()
   "Save the state of all custom frame settings."
   (interactive)
@@ -248,12 +263,23 @@ wipe the state on the storage call `tframe-restore' or
     (tframe-manager-advance-display mng 0 0)
     mng))
 
-;(tframe-restore)
+;;;###autoload
+(defun tframe-list ()
+  "List settings for current display."
+  (interactive)
+  (-> the-tframe-manager
+      (tframe-manager-display t)
+      config-manager-list-entries-buffer))
+
+(global-set-key "\C-x9" 'tframe-reset;'tframe-set-index-setting
+		)
+(global-set-key "\C-\\" 'tframe-add-or-advance-setting)
+
+;(global-set-key "\C-x9" 'cframe-set-index-setting)
+;(global-set-key "\C-\\" 'cframe-add-or-advance-setting)
 
 (defun a ()
   (interactive)
   (-> the-tframe-manager
       (tframe-manager-display t)
-      (config-manager-list-entries-buffer "Tmp")))
-
-;(tframe-add-or-advance-setting t)
+      (config-manager-entry 'cycle)))
