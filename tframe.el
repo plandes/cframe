@@ -97,10 +97,12 @@ of `cframe-settings'.")
 ;;   (config-manager-entry name))
 
 (cl-defmethod object-format ((this tframe-display))
-  (with-slots (name id entries entry-index) this
-    (format "%s [%s]: %d entries, index: %d"
+  (with-slots (name id entries ;entry-index
+		    ) this
+    (format "%s [%s]: %d entries"
 	    name id (length entries)
-	    (tframe-display-index this))))
+	    ;(tframe-display-index this)
+	    )))
 
 (cl-defmethod initialize-instance ((this tframe-display) &rest rest)
   (with-slots (slots list-header-fields cycle-method) this
@@ -189,12 +191,14 @@ If INCLUDE-DISPLAY-P is non-nil, or provided interactively with
   (interactive "P")
   (let* ((display (-> the-tframe-manager
 		      tframe-manager-display))
-	 (idx (config-manager-index display))
-	 (setting (config-manager-entry display idx)))
+	 ;(idx (config-manager-index display))
+	 ;(setting (config-manager-entry display idx))
+	 (setting (config-manager-current-instance display)))
     (-> (if include-display-p
 	    (concat (object-format display) ", "))
 	(concat (object-format setting))
-	message)))
+	message))
+  )
 
 ;;;###autoload
 (defun tframe-add-or-advance-setting (addp)

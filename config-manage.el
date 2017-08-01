@@ -187,10 +187,10 @@ This parameter is used as the default for `criteria' \(see
 	    :protection :private
 	    :documentation
 	    "Contains the data structure for the buffer entries.")
-   (entry-index :initarg :entry-index
-		:initform 0
-		:type integer
-		:documentation "Index of current entry.")
+   ;; (entry-index :initarg :entry-index
+   ;; 		:initform 0
+   ;; 		:type integer
+   ;; 		:documentation "Index of current entry.")
    (list-header-fields :initarg :list-header-fields
 		       :initform '("C" "Name"  "Description")
 		       :type list
@@ -230,31 +230,31 @@ Keeps track of the last entry for last-visit cycle method."))
   (error "No implementation of `config-manager-entry-default-name' for class `%S'"
 	 (eieio-object-class this)))
 
-(cl-defmethod config-manager-index ((this config-manager) &optional index)
-  "Get the `config-entry' (`entry-index' slot) index.
+;; (cl-defmethod config-manager-index ((this config-manager) &optional index)
+;;   "Get the `config-entry' (`entry-index' slot) index.
 
-If INDEX is given, disregard the `entry-index' slot and adjust (mod
-it) to the cardinality of the entries."
-  (with-slots (entries entry-index) this
-    (let ((slen (length entries)))
-      (if (= 0 slen)
-	  (error "No entries exist--use `tframe-add-or-advance-entry'"))
-      (-> (or index entry-index)
-	  (mod slen)))))
+;; If INDEX is given, disregard the `entry-index' slot and adjust (mod
+;; it) to the cardinality of the entries."
+;;   (with-slots (entries entry-index) this
+;;     (let ((slen (length entries)))
+;;       (if (= 0 slen)
+;; 	  (error "No entries exist--use `tframe-add-or-advance-entry'"))
+;;       (-> (or index entry-index)
+;; 	  (mod slen)))))
 
-(cl-defmethod config-manager-set-index ((this config-manager) index)
-  "Get the `config-entry' (`entry-index' slot) index.
+;; (cl-defmethod config-manager-set-index ((this config-manager) index)
+;;   "Get the `config-entry' (`entry-index' slot) index.
 
-See `config-manager-index'."
-  (with-slots (entry-index) this
-    (->> (config-manager-index this index)
-	 (setq entry-index))))
+;; See `config-manager-index'."
+;;   (with-slots (entry-index) this
+;;     (->> (config-manager-index this index)
+;; 	 (setq entry-index))))
 
-(cl-defmethod config-manager-increment-index ((this config-manager)
-					      &optional num)
-  "Increment the display index by NUM positions, which defaults to 1."
-  (with-slots (entry-index) this
-    (config-manager-set-index this (+ entry-index (or num 1)))))
+;; (cl-defmethod config-manager-increment-index ((this config-manager)
+;; 					      &optional num)
+;;   "Increment the display index by NUM positions, which defaults to 1."
+;;   (with-slots (entry-index) this
+;;     (config-manager-set-index this (+ entry-index (or num 1)))))
 
 (cl-defmethod config-manager-cycle-entries ((this config-manager) entry)
   "Rearrange the entry order to place ENTRY in place after cycling."
@@ -294,8 +294,8 @@ CRITERIA is:
 		  this #'(lambda (entry)
 			   (string-equal criteria
 					 (buffer-entry-name entry)))))
-		((integerp criteria)
-		 (nth (config-manager-index this criteria) entries))
+		;; ((integerp criteria)
+		;;  (nth (config-manager-index this criteria) entries))
 		((config-manager-entry-exists-p this criteria))
 		((= len 0) nil)
 		((= len 1) (car entries))
@@ -366,17 +366,19 @@ This is the typical unique name (buffers, files etc) creation."
 (cl-defmethod config-manager-insert-entry ((this config-manager)
 					   &optional entry)
   "Add and optionally create first a new entry if ENTRY is nil."
-  (let* ((entry (or entry (config-manager-create-default this)))
-	 (name (config-entry-name entry)))
-    (with-slots (entries entry-index) this
-      (->> entries
-	   (-map (lambda (elt)
-		   (config-entry-name elt)))
-	   (config-manager-iterate-name name)
-	   (config-entry-set-name entry))
-      (setq entries
-	    (config-manager-insert-at-position entries entry entry-index))
-      (cl-incf entry-index))))
+  ;; (let* ((entry (or entry (config-manager-create-default this)))
+  ;; 	 (name (config-entry-name entry)))
+  ;;   (with-slots (entries entry-index) this
+  ;;     (->> entries
+  ;; 	   (-map (lambda (elt)
+  ;; 		   (config-entry-name elt)))
+  ;; 	   (config-manager-iterate-name name)
+  ;; 	   (config-entry-set-name entry))
+  ;;     (setq entries
+  ;; 	    (config-manager-insert-at-position entries entry entry-index))
+  ;;     (cl-incf entry-index)))
+  (config-manager-cycle-entries entry)
+  )
 
 (cl-defmethod config-manager-set-name ((this config-manager) &optional new-name)
   "Set the name of this `config-manager' to NEW-NAME."
@@ -517,7 +519,8 @@ BUFFER-NAME is the name of the buffer holding the entries for the mode."
 (cl-defmethod initialize-instance ((this config-manager) &rest rest)
   (with-slots (slots) this
     (setq slots
-	  (append slots '(name entry-index entries))))
+	  (append slots ;'(name entry-index entries)
+		  '(name entries))))
   (apply #'cl-call-next-method this rest)
   (config-manager-set-name this))
 
