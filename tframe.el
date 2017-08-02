@@ -197,8 +197,7 @@ If INCLUDE-DISPLAY-P is non-nil, or provided interactively with
     (-> (if include-display-p
 	    (concat (object-format display) ", "))
 	(concat (object-format setting))
-	message))
-  )
+	message)))
 
 ;;;###autoload
 (defun tframe-add-or-advance-setting (addp)
@@ -287,3 +286,6 @@ wipe the state on the storage call `tframe-restore' or
   (-> the-tframe-manager
       (tframe-manager-display t)
       (config-manager-entry 'cycle)))
+
+(when nil
+  (tframe-restore))

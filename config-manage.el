@@ -377,8 +377,8 @@ This is the typical unique name (buffers, files etc) creation."
   ;;     (setq entries
   ;; 	    (config-manager-insert-at-position entries entry entry-index))
   ;;     (cl-incf entry-index)))
-  (config-manager-cycle-entries entry)
-  )
+  (->> (or entry (config-manager-create-default this))
+       (config-manager-cycle-entries this)))
 
 (cl-defmethod config-manager-set-name ((this config-manager) &optional new-name)
   "Set the name of this `config-manager' to NEW-NAME."
