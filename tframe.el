@@ -91,7 +91,7 @@ of `cframe-settings'.")
   (with-slots (id) this
     (format "(%d X %d)" (car id) (cdr id))))
 
-(cl-defmethod config-manager-create-default ((this tframe-display))
+(cl-defmethod config-manager-new-entry ((this tframe-display))
   (tframe-setting))
 
 (cl-defmethod object-format ((this tframe-display))
@@ -246,7 +246,7 @@ wipe the state on the storage call `tframe-restore' or
       (tframe-manager-display t)
       config-manager-list-entries-buffer))
 
-(global-set-key "\C-x9" 'tframe-reset)
+(global-set-key "\C-x9" 'tframe-restore)
 (global-set-key "\C-\\" 'tframe-add-or-advance-setting)
 ;(global-set-key "\C-x9" 'cframe-set-index-setting)
 ;(global-set-key "\C-\\" 'cframe-add-or-advance-setting)

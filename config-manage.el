@@ -221,11 +221,13 @@ Keeps track of the last entry for last-visit cycle method."))
 	  (list elt)
 	  (cl-subseq seq pos)))
 
-(cl-defmethod config-manager-create-default ((this config-manager))
-  (error "No implementation of `config-manager-create-default' for class `%S'"
+(cl-defmethod config-manager-new-entry ((this config-manager))
+  "Create a new nascent entry object."
+  (error "No implementation of `config-manager-new-entry' for class `%S'"
 	 (eieio-object-class this)))
 
 (cl-defmethod config-manager-entry-default-name ((this config-manager))
+  "Return a name for a new entry created with `config-manager-new-entry'."
   (error "No implementation of `config-manager-entry-default-name' for class `%S'"
 	 (eieio-object-class this)))
 
@@ -267,8 +269,6 @@ CRITERIA is:
 		  this #'(lambda (entry)
 			   (string-equal criteria
 					 (buffer-entry-name entry)))))
-		;; ((integerp criteria)
-		;;  (nth (config-manager-index this criteria) entries))
 		((config-manager-entry-exists-p this criteria))
 		((= len 0) nil)
 		((= len 1) (car entries))
@@ -319,7 +319,7 @@ The default uses:
 (defun config-manager-iterate-name (name names)
   "Create a unique NAME from existing NAMES by iterating FORM<N> integer.
 
-N is an integer.
+where N is an integer.
 
 This is the typical unique name (buffers, files etc) creation."
   (->> names
@@ -339,8 +339,15 @@ This is the typical unique name (buffers, files etc) creation."
 (cl-defmethod config-manager-insert-entry ((this config-manager)
 					   &optional entry)
   "Add and optionally create first a new entry if ENTRY is nil."
-  (->> (or entry (config-manager-create-default this))
-       (config-manager-cycle-entries this)))
+  (let* ((entry (or entry (config-manager-new-entry this)))
+  	 (name (config-entry-name entry)))
+    (with-slots (entries entry-index) this
+      (->> entries
+  	   (-map (lambda (elt)
+  		   (config-entry-name elt)))
+  	   (config-manager-iterate-name name)
+  	   (config-entry-set-name entry))
+      (config-manager-cycle-entries this entry))))
 
 (cl-defmethod config-manager-set-name ((this config-manager) &optional new-name)
   "Set the name of this `config-manager' to NEW-NAME."
