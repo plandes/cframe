@@ -3,6 +3,7 @@
 (require 'time-stamp)
 (require 'dash)
 (require 'noflet)
+(require 'config-manage)
 
 (defvar tframe-settings-restore-hooks nil
   "Functions to call with `cframae-settings-restore' is called.
@@ -93,16 +94,10 @@ of `cframe-settings'.")
 (cl-defmethod config-manager-create-default ((this tframe-display))
   (tframe-setting))
 
-;; (cl-defmethod config-manager-switch ((this tframe-display) name)
-;;   (config-manager-entry name))
-
 (cl-defmethod object-format ((this tframe-display))
-  (with-slots (name id entries ;entry-index
-		    ) this
+  (with-slots (name id entries) this
     (format "%s [%s]: %d entries"
-	    name id (length entries)
-	    ;(tframe-display-index this)
-	    )))
+	    name id (length entries))))
 
 (cl-defmethod initialize-instance ((this tframe-display) &rest rest)
   (with-slots (slots list-header-fields cycle-method) this
@@ -136,24 +131,10 @@ If the dipslay doesn't exist create a new display if NO-CREATE-P is non-nil."
 	      displays (append displays (list display))))
       display)))
 
-(cl-defmethod tframe-manager-advance-display ((this tframe-manager)
-					      &optional index num)
-  "Iterate the settings index in the current display and restore it.
-
-This increments the display index by NUM positions, which defaults to 1.
-
-This modifies the frame settings."
-  ;; (let ((display (tframe-manager-display this))
-  ;; 	(num (or num 1)))
-  ;;   (if index (config-manager-set-index display index))
-  ;;   (config-manager-increment-index display num)
-  ;;   (config-manager-entry-restore display)
-  ;;   num)
+(cl-defmethod tframe-manager-advance-display ((this tframe-manager))
+  "Iterate the settings for the current display and restore it."
   (let ((display (tframe-manager-display this)))
     (config-manager-switch display 'cycle)))
-
-(cl-defmethod tframe-manager-clear-displays ((this tframe-manager))
-  (oset this :displays nil))
 
 (cl-defmethod initialize-instance ((this tframe-manager) &rest rest)
   (with-slots (slots) this
@@ -191,8 +172,6 @@ If INCLUDE-DISPLAY-P is non-nil, or provided interactively with
   (interactive "P")
   (let* ((display (-> the-tframe-manager
 		      tframe-manager-display))
-	 ;(idx (config-manager-index display))
-	 ;(setting (config-manager-entry display idx))
 	 (setting (config-manager-current-instance display)))
     (-> (if include-display-p
 	    (concat (object-format display) ", "))
@@ -222,26 +201,8 @@ If INCLUDE-DISPLAY-P is non-nil, or provided interactively with
 			   current-prefix-arg)
 			 0)))
   (-> the-tframe-manager
-      (tframe-manager-advance-display index 0))
+      tframe-manager-advance-display)
   (tframe-current-setting))
-
-;;;###autoload
-(defun tframe-reset ()
-  "Reset the state of the custom frame manager.
-
-This blows away all frame settings configuration in memory.  To
-wipe the state on the storage call `tframe-restore' or
-`tframe-add-or-advance-setting' after calling this."
-  (interactive)
-  (setq the-tframe-manager
-	(tframe-manager :file tframe-persistency-file-name)))
-
-;;;###autoload
-(defun tframe-clear ()
-  "Remove all displays and start completely over \(careful!\)."
-  (interactive)
-  (-> the-tframe-manager
-      tframe-manager-clear-displays))
 
 ;;;###autoload
 (defun tframe-save ()
@@ -263,8 +224,19 @@ wipe the state on the storage call `tframe-restore' or
 		(tframe-reset))))
     (oset mng :file file)
     (setq the-tframe-manager mng)
-    (tframe-manager-advance-display mng 0 0)
+    (tframe-manager-advance-display mng)
     mng))
+
+;;;###autoload
+(defun tframe-reset ()
+  "Reset the state of the custom frame manager.
+
+This blows away all frame settings configuration in memory.  To
+wipe the state on the storage call `tframe-restore' or
+`tframe-add-or-advance-setting' after calling this."
+  (interactive)
+  (setq the-tframe-manager
+	(tframe-manager :file tframe-persistency-file-name)))
 
 ;;;###autoload
 (defun tframe-list ()
@@ -274,18 +246,10 @@ wipe the state on the storage call `tframe-restore' or
       (tframe-manager-display t)
       config-manager-list-entries-buffer))
 
-(global-set-key "\C-x9" 'tframe-reset;'tframe-set-index-setting
-		)
+(global-set-key "\C-x9" 'tframe-reset)
 (global-set-key "\C-\\" 'tframe-add-or-advance-setting)
-
 ;(global-set-key "\C-x9" 'cframe-set-index-setting)
 ;(global-set-key "\C-\\" 'cframe-add-or-advance-setting)
-
-(defun a ()
-  (interactive)
-  (-> the-tframe-manager
-      (tframe-manager-display t)
-      (config-manager-entry 'cycle)))
 
 (when nil
   (tframe-restore))
