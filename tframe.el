@@ -250,6 +250,3 @@ wipe the state on the storage call `tframe-restore' or
 (global-set-key "\C-\\" 'tframe-add-or-advance-setting)
 ;(global-set-key "\C-x9" 'cframe-set-index-setting)
 ;(global-set-key "\C-\\" 'cframe-add-or-advance-setting)
-
-(when nil
-  (tframe-restore))
