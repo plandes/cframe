@@ -91,7 +91,8 @@ of `cframe-settings'.")
   (with-slots (id) this
     (format "(%d X %d)" (car id) (cdr id))))
 
-(cl-defmethod config-manager-new-entry ((this tframe-display))
+(cl-defmethod config-manager-new-entry ((this tframe-display)
+					&optional criteria)
   (tframe-setting))
 
 (cl-defmethod object-format ((this tframe-display))
@@ -242,9 +243,11 @@ wipe the state on the storage call `tframe-restore' or
 (defun tframe-list ()
   "List settings for current display."
   (interactive)
-  (-> the-tframe-manager
-      (tframe-manager-display t)
-      config-manager-list-entries-buffer))
+  (let ((display (-> the-tframe-manager
+		     (tframe-manager-display t))))
+    (if display
+	(config-manager-list-entries-buffer display)
+      (error "No display entries--use `tframe-add-or-advance-setting'"))))
 
 (global-set-key "\C-x9" 'tframe-restore)
 (global-set-key "\C-\\" 'tframe-add-or-advance-setting)

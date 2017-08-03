@@ -164,6 +164,9 @@ The description of this entry, used in `config-manager-list-entries-buffer'.")
   (with-slots (name) this
     name))
 
+(cl-defmethod object-print ((this config-entry))
+  (object-format this))
+
 
 
 (defclass config-manager (config-persistent)
@@ -187,6 +190,7 @@ This parameter is used as the default for `criteria' \(see
    (entries :initarg :entries
 	    :initform nil		; initialize with 0 entries
 	    :type (or null list)
+	    :reader config-manager--entries
 	    :protection :private
 	    :documentation
 	    "Contains the data structure for the buffer entries.")
@@ -221,8 +225,11 @@ Keeps track of the last entry for last-visit cycle method."))
 	  (list elt)
 	  (cl-subseq seq pos)))
 
-(cl-defmethod config-manager-new-entry ((this config-manager))
-  "Create a new nascent entry object."
+(cl-defmethod config-manager-new-entry ((this config-manager)
+					&optional criteria)
+  "Create a new nascent entry object.
+Returns the config entry we switched to based on CRITERIA \(see
+`config-manager-entry'."
   (error "No implementation of `config-manager-new-entry' for class `%S'"
 	 (eieio-object-class this)))
 
@@ -231,7 +238,8 @@ Keeps track of the last entry for last-visit cycle method."))
   (error "No implementation of `config-manager-entry-default-name' for class `%S'"
 	 (eieio-object-class this)))
 
-(cl-defmethod config-manager-cycle-entries ((this config-manager) entry)
+(cl-defmethod config-manager-cycle-entries ((this config-manager) entry
+					    &optional mode)
   "Rearrange the entry order to place ENTRY in place after cycling."
   (with-slots (entries cycle-method) this
     (let ((first (car entries)))
@@ -239,7 +247,8 @@ Keeps track of the last entry for last-visit cycle method."))
       (if (and (eq 'next cycle-method)
 	       (> (length entries) 1)
 	       (not (eq first entry)))
-	  (setq entries (append (remove first entries) (list first)))))))
+	  (setq entries (append (remove first entries)
+				(if first (list first))))))))
 
 (cl-defmethod config-manager-entry-exists-p ((this config-manager) entry)
   "If ENTRY is an instance of a class or subclass of `buffer-entry' return it."
@@ -347,9 +356,10 @@ This is the typical unique name (buffers, files etc) creation."
   		   (config-entry-name elt)))
   	   (config-manager-iterate-name name)
   	   (config-entry-set-name entry))
-      (config-manager-cycle-entries this entry))))
+      (config-manager-cycle-entries this entry 'after))))
 
-(cl-defmethod config-manager-set-name ((this config-manager) &optional new-name)
+(cl-defmethod config-manager-set-name ((this config-manager)
+				       &optional new-name)
   "Set the name of this `config-manager' to NEW-NAME."
   (with-slots (name) this
     (let ((new-name (or new-name (config-manager-entry-default-name this))))
@@ -360,9 +370,6 @@ This is the typical unique name (buffers, files etc) creation."
   "Restore this `config-manager' and contained `config-entry' instances."
   (let ((entry (or entry (config-manager-entry this 0))))
     (config-entry-restore entry)))
-
-(cl-defmethod config-manager--entries ((this config-manager))
-  (oref this :entries))
 
 (cl-defmethod config-manager-switch ((this config-manager) criteria)
   "Switch to a config entry.
