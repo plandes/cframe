@@ -274,10 +274,10 @@ CRITERIA is:
 	 entry)
     (setq entry
 	  (cond ((stringp criteria)
-		 (config-manager-first-entry
-		  this #'(lambda (entry)
-			   (string-equal criteria
-					 (buffer-entry-name entry)))))
+		 (block entry-lookup
+		   (dolist (entry (config-manager--entries this))
+		     (if (equal criteria (config-entry-name entry))
+			 (return-from entry-lookup entry)))))
 		((config-manager-entry-exists-p this criteria))
 		((= len 0) nil)
 		((= len 1) (car entries))
@@ -383,6 +383,7 @@ Returns the config entry we switched to based on CRITERIA \(see
 		    this (and (stringp criteria) criteria)))))
     (config-entry-restore entry)
     (config-manager-cycle-entries this entry)
+    ;(config-manage-mode-refresh)
     entry))
 
 (cl-defmethod config-manager-cycle-methods ((this config-manager))
@@ -400,10 +401,7 @@ Returns the config entry we switched to based on CRITERIA \(see
   "Return a multi-listing of the buffer entries contained in this manager."
   (cl-flet* ((get-entries
 	      ()
-	      (sort (copy-tree (config-manager--entries this))
-		    #'(lambda (a b)
-			(string< (config-entry-name a)
-				 (config-entry-name b)))))
+	      (config-manager--entries this))
 	     (get-max
 	      (getter-fn)
 	      (let ((entries (get-entries)))
@@ -447,7 +445,7 @@ Returns the config entry we switched to based on CRITERIA \(see
 		entry)
 	    ((null lst))
 	  (setq entry (car lst))
-	  (let ((name (copy-sequence (config-entry-name entry)))
+	  (let ((name (config-entry-name entry))
 		(status (cdr (assq (gethash (config-entry-name entry)
 					    config-entry-status)
 				   config-manager-status-defs))))
@@ -542,9 +540,10 @@ BUFFER-NAME is the name of the buffer holding the entries for the mode."
     ("^\\([- \t]+\\)$" 1 config-manage-font-lock-headers-face t))
   "Additional expressions to highlight in buffer manage mode.")
 
-(defun config-manage-mode-assert ()
+(defun config-manage-mode-assert (&optional no-error-p)
   "Throw an error if not in `config-manage-mode'."
-  (if (not (eq major-mode 'config-manage-mode))
+  (if (and (not no-error-p)
+	   (not (eq major-mode 'config-manage-mode)))
       (error "Must be in `config-manage-mode' for this command")))
 
 (defun config-manage-mode-quit ()
@@ -611,7 +610,7 @@ EVENT mouse event data."
   (setq name (or name (config-manage-mode-name-at-point)))
   (let ((this config-manager-instance))
     (config-manage-mode-assert)
-    (config-manager-switch this) name))
+    (config-manager-switch this name)))
 
 (defun config-manage-mode-view (&optional name)
   "Activates the buffer entry with name NAME."
@@ -641,7 +640,8 @@ EVENT mouse event data."
     (config-manager-list-entries config-manager-instance)
     (setq buffer-read-only t)
     (goto-char (point-min))
-    (forward-line (max 3 line))
+    (forward-line 2;(min 2 line)
+		  )
     (beginning-of-line)
     (set-window-point (get-buffer-window (current-buffer)) (point))))
 
