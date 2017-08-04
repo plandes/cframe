@@ -170,8 +170,12 @@ If the dipslay doesn't exist create a new display if NO-CREATE-P is non-nil."
 		  the-tframe-manager)
 	     (oset the-tframe-manager :file val))))
 
+(setq the-tframe-manager nil)
 (defvar the-tframe-manager nil
   "The singleton manager instance.")
+
+(defun the-tframe-manager ()
+  (or the-tframe-manager (tframe-restore)))
 
 ;;;###autoload
 (defun tframe-current-setting (&optional include-display-p)
@@ -180,7 +184,7 @@ If the dipslay doesn't exist create a new display if NO-CREATE-P is non-nil."
 If INCLUDE-DISPLAY-P is non-nil, or provided interactively with
 \\[universal-argument]]."
   (interactive "P")
-  (let* ((display (-> the-tframe-manager
+  (let* ((display (-> (the-tframe-manager)
 		      tframe-manager-display))
 	 (setting (config-manager-current-instance display)))
     (-> (if include-display-p
@@ -194,11 +198,11 @@ If INCLUDE-DISPLAY-P is non-nil, or provided interactively with
   (interactive (list current-prefix-arg))
   (if addp
       (progn
-	(-> the-tframe-manager
+	(-> (the-tframe-manager)
 	    tframe-manager-display
 	    config-manager-insert-entry)
 	(message "Added setting and saved"))
-    (-> the-tframe-manager
+    (-> (the-tframe-manager)
 	tframe-manager-advance-display))
   (tframe-current-setting))
 
@@ -206,7 +210,7 @@ If INCLUDE-DISPLAY-P is non-nil, or provided interactively with
 (defun tframe-save ()
   "Save the state of all custom frame settings."
   (interactive)
-  (-> the-tframe-manager
+  (-> (the-tframe-manager)
       config-persistable-save))
 
 ;;;###autoload
@@ -246,7 +250,7 @@ wipe the state on the storage call `tframe-restore' or
 (defun tframe-list ()
   "List settings for current display."
   (interactive)
-  (let ((display (-> the-tframe-manager
+  (let ((display (-> (the-tframe-manager)
 		     (tframe-manager-display t))))
     (if display
 	(config-manager-list-entries-buffer display)
