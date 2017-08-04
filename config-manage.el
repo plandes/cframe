@@ -7,7 +7,7 @@
 ;; Maintainer: Paul Landes
 ;; Keywords: configuration settings persistable
 ;; URL: https://github.com/plandes/config-manage
-;; Package-Requires: ((emacs "25") (choice-program "0.1"))
+;; Package-Requires: ((emacs "25") (choice-program "0.1") (dash))
 
 ;; This file is not part of GNU Emacs.
 
@@ -28,8 +28,18 @@
 
 ;;; Commentary:
 
+;; This package provides abstract behavior for EIEIO classes that are meant to
+;; be extended.  This library provides classes that:
+
+;; - Provide a way to manage configuration in a simplier file persistence than
+;;   the EIEIO default
+;; - GUI (mode buffer) that provides an easy interface to create, read, update
+;;   and destroy configuration objects that then CRUD through to disk
+;;   (optionally).
+
 ;;; Code:
 
+(require 'dash)
 (require 'eieio)
 
 (defclass config-persistent ()
@@ -74,6 +84,8 @@ this error:
 	    (cl-no-next-method))))
 
 (cl-defmethod config-persistent-unpersist-value ((this config-persistent) val)
+  "Unpersist VAL by determining its type and then recursively applying to
+create unerpsist \(optionally) children classes and slots."
   (or (and (consp val)
 	   (or (let ((fval (car val)))
 		 (and (consp fval)
@@ -94,6 +106,8 @@ this error:
 		   (setf (slot-value this slot) val)))))))
 
 (cl-defmethod config-persistent-unpersist ((vals list))
+  "Restore the objects state from VALS, which has a symbols
+`class' and `slots'."
   (let* ((class (cdr (assq 'class vals)))
 	 (slots (cdr (assq 'slots vals)))
 	 (obj (make-instance class)))
@@ -112,18 +126,19 @@ this error:
 (cl-defmethod config-persistable-save ((this config-persistable))
   "Persist manager and compiler configuration."
   (with-slots (file) this
-    (let ((save-class-name (->> this eieio-object-class eieio-class-name))
-	  (state (config-persistent-persist this)))
-      (with-temp-buffer
-	(insert (format "\
+    (when file
+     (let ((save-class-name (->> this eieio-object-class eieio-class-name))
+	   (state (config-persistent-persist this)))
+       (with-temp-buffer
+	 (insert (format "\
 ;; -*- emacs-lisp -*- <%s %s>
 ;; Object: %s.  Don't change this file.\n"
-			(time-stamp-string "%02y/%02m/%02d %02H:%02M:%02S")
-			file save-class-name))
-	(insert (with-output-to-string
-		  (pp state)))
-	(write-region (point-min) (point-max) file))
-      (message "Wrote %s" file))))
+			 (time-stamp-string "%02y/%02m/%02d %02H:%02M:%02S")
+			 file save-class-name))
+	 (insert (with-output-to-string
+		   (pp state)))
+	 (write-region (point-min) (point-max) file))
+       (message "Wrote %s" file)))))
 
 
 
@@ -238,6 +253,9 @@ Returns the config entry we switched to based on CRITERIA \(see
   (error "No implementation of `config-manager-entry-default-name' for class `%S'"
 	 (eieio-object-class this)))
 
+(cl-defmethod config-manager--update-entries ((this config-manager) entries)
+  "Observer pattern to for observers to react to entries modifications.")
+
 (cl-defmethod config-manager-cycle-entries ((this config-manager) entry
 					    &optional mode)
   "Rearrange the entry order to place ENTRY in place after cycling."
@@ -248,7 +266,9 @@ Returns the config entry we switched to based on CRITERIA \(see
 	       (> (length entries) 1)
 	       (not (eq first entry)))
 	  (setq entries (append (remove first entries)
-				(if first (list first))))))))
+				(if first (list first)))))
+      (config-manager--update-entries this entries)
+      entries)))
 
 (cl-defmethod config-manager-entry-exists-p ((this config-manager) entry)
   "If ENTRY is an instance of a class or subclass of `buffer-entry' return it."
@@ -293,8 +313,8 @@ CRITERIA is:
 
 (cl-defmethod config-manager-current-instance ((this config-manager))
   (with-slots (last-switched-to) this
-   (or last-switched-to
-       (first (config-manager--entries this)))))
+    (or last-switched-to
+	(first (config-manager--entries this)))))
 
 (cl-defmethod config-manager-entry-cycle ((this config-manager))
   "Return the next `cycled' entry based on slot `cycle-method'.
@@ -371,6 +391,16 @@ This is the typical unique name (buffers, files etc) creation."
   (let ((entry (or entry (config-manager-entry this 0))))
     (config-entry-restore entry)))
 
+(cl-defmethod config-manager-remove-entry ((this config-manager) entry)
+  "Remove/kill ENTRY from this manager."
+  (with-slots (entries) this
+    (when (memq entry entries)
+      (let ((name (config-entry-name entry)))
+	(setq entries (remove entry entries))
+	(config-manager--update-entries this entries)
+	(destructor entry)
+	entry))))
+
 (cl-defmethod config-manager-switch ((this config-manager) criteria)
   "Switch to a config entry.
 
@@ -383,8 +413,13 @@ Returns the config entry we switched to based on CRITERIA \(see
 		    this (and (stringp criteria) criteria)))))
     (config-entry-restore entry)
     (config-manager-cycle-entries this entry)
-    ;(config-manage-mode-refresh)
+    (config-manage-refresh-windows)
     entry))
+
+(cl-defmethod config-manager-list-clear ((this config-manager))
+  (with-slots (entries) this
+    (setq entries nil)
+    (config-manager--update-entries this entries)))
 
 (cl-defmethod config-manager-cycle-methods ((this config-manager))
   "All valid cycle methods (see `config-manager-entry-cycle')."
@@ -493,6 +528,16 @@ BUFFER-NAME is the name of the buffer holding the entries for the mode."
   (apply #'cl-call-next-method this rest)
   (config-manager-set-name this))
 
+(defun config-manage-refresh-windows ()
+  "Refresh config entries list buffer."
+  (->> (window-list)
+       (-map (lambda (win)
+	       (let ((buf (window-buffer win)))
+		 (with-current-buffer buf
+		   (if (config-manage-mode-assert t)
+		       (config-manage-mode-refresh))))))))
+(add-hook 'buffer-list-update-hook #'config-manage-refresh-windows)
+
 
 
 ;;; modal
@@ -540,11 +585,16 @@ BUFFER-NAME is the name of the buffer holding the entries for the mode."
     ("^\\([- \t]+\\)$" 1 config-manage-font-lock-headers-face t))
   "Additional expressions to highlight in buffer manage mode.")
 
-(defun config-manage-mode-assert (&optional no-error-p)
-  "Throw an error if not in `config-manage-mode'."
-  (if (and (not no-error-p)
-	   (not (eq major-mode 'config-manage-mode)))
-      (error "Must be in `config-manage-mode' for this command")))
+(defun config-manage-mode-assert (&optional no-error-p this)
+  "Throw an error if not in `config-manage-mode' when NO-ERROR-P is nil.
+
+Pattern match on THIS if it is given and this is a `config-manager-mode'."
+  (let ((matchp (and (eq major-mode 'config-manage-mode)
+		     (or (not this)
+			 (equal this config-manager-instance)))))
+   (if (and (not no-error-p) (not matchp))
+       (error "Must be in `config-manage-mode' for this command or wrong manager")
+     matchp)))
 
 (defun config-manage-mode-quit ()
   "Quit from within the `config-manage-mode'."
@@ -640,8 +690,7 @@ EVENT mouse event data."
     (config-manager-list-entries config-manager-instance)
     (setq buffer-read-only t)
     (goto-char (point-min))
-    (forward-line 2;(min 2 line)
-		  )
+    (forward-line 2)
     (beginning-of-line)
     (set-window-point (get-buffer-window (current-buffer)) (point))))
 
@@ -745,7 +794,7 @@ Special commands:
 (define-key config-manage-mode-map "v" 'config-manage-mode-view)
 
 (defvar config-manage-mode-menu-definition
-  (list "Buffer Manager"
+  (list "Config Manage"
 	["Create New" config-manage-mode-new t]
 	["Goto Entry" config-manage-mode-activate-buffer t]
 	"-"

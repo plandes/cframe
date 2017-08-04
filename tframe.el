@@ -56,9 +56,10 @@ of `cframe-settings'.")
 				       &optional new-name)
   "Set the name of the `tframe-setting'."
   (with-slots (name width) this
-    (let ((new-name (or new-name (cond ((<= width 80) "narrow")
-				       ((<= width 140) "wide")
-				       (t "huge")))))
+    (let ((new-name (or new-name
+			(cond ((<= width 80) "narrow")
+			      ((<= width 140) "wide")
+			      (t "huge")))))
       (setq name new-name))))
 
 (cl-defmethod object-format ((this tframe-setting))
@@ -100,6 +101,9 @@ of `cframe-settings'.")
     (format "%s [%s]: %d entries"
 	    name id (length entries))))
 
+(cl-defmethod config-manager--update-entries ((this tframe-display) entries)
+  (tframe-save))
+
 (cl-defmethod initialize-instance ((this tframe-display) &rest rest)
   (with-slots (slots list-header-fields cycle-method) this
     (setq slots (append slots '(id))
@@ -134,12 +138,17 @@ If the dipslay doesn't exist create a new display if NO-CREATE-P is non-nil."
 
 (cl-defmethod tframe-manager-advance-display ((this tframe-manager))
   "Iterate the settings for the current display and restore it."
-  (let ((display (tframe-manager-display this)))
-    (config-manager-switch display 'cycle)))
+  (-> (tframe-manager-display this)
+      (config-manager-switch 'cycle)))
+
+(cl-defmethod tframe-manager-reset ((this tframe-manager))
+  (with-slots (displays) this
+    (dolist (display displays)
+      (config-manager-list-clear display))))
 
 (cl-defmethod initialize-instance ((this tframe-manager) &rest rest)
   (with-slots (slots) this
-    (setq slots '(displays file)))
+    (setq slots '(displays)))
   (apply #'cl-call-next-method this rest))
 
 
@@ -188,7 +197,7 @@ If INCLUDE-DISPLAY-P is non-nil, or provided interactively with
 	(-> the-tframe-manager
 	    tframe-manager-display
 	    config-manager-insert-entry)
-	(tframe-save)
+	;(tframe-save)
 	(message "Added setting and saved"))
     (-> the-tframe-manager
 	tframe-manager-advance-display))
@@ -229,15 +238,21 @@ If INCLUDE-DISPLAY-P is non-nil, or provided interactively with
     mng))
 
 ;;;###autoload
-(defun tframe-reset ()
+(defun tframe-reset (&optional hardp)
   "Reset the state of the custom frame manager.
+
+HARDP means to recreate the manager instance, all data is reset
+\\(across all displays).  This is very destructive.
 
 This blows away all frame settings configuration in memory.  To
 wipe the state on the storage call `tframe-restore' or
 `tframe-add-or-advance-setting' after calling this."
-  (interactive)
-  (setq the-tframe-manager
-	(tframe-manager :file tframe-persistency-file-name)))
+  (interactive "P")
+  (when (or hardp (not the-tframe-manager))
+    (setq the-tframe-manager
+	  (tframe-manager :file tframe-persistency-file-name)))
+  (tframe-manager-reset the-tframe-manager)
+  the-tframe-manager)
 
 ;;;###autoload
 (defun tframe-list ()
