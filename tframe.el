@@ -197,21 +197,9 @@ If INCLUDE-DISPLAY-P is non-nil, or provided interactively with
 	(-> the-tframe-manager
 	    tframe-manager-display
 	    config-manager-insert-entry)
-	;(tframe-save)
 	(message "Added setting and saved"))
     (-> the-tframe-manager
 	tframe-manager-advance-display))
-  (tframe-current-setting))
-
-;;;###autoload
-(defun tframe-set-index-setting (index)
-  "Set the display's setting to INDEX and refresh the frame."
-  (interactive (list (or (if (consp current-prefix-arg)
-			     0
-			   current-prefix-arg)
-			 0)))
-  (-> the-tframe-manager
-      tframe-manager-advance-display)
   (tframe-current-setting))
 
 ;;;###autoload
