@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2015 - 2017 Paul Landes
 
-;; Version: 0.1
+;; Version: 0.2
 ;; Author: Paul Landes
 ;; Maintainer: Paul Landes
 ;; Keywords: frame customize
@@ -39,108 +39,15 @@
 (require 'time-stamp)
 (require 'dash)
 (require 'noflet)
-
-;; EIEIO list types can't unpersist as they produce this error:
-;;   eieio-persistent-validate/fix-slot-value: In save file, list of object
-;;   constructors found, but no :type specified for slot displays of type nil
-(defclass cframe-persistent ()
-  ((slots :initarg :slots
-	  :initform nil
-	  :type list))
-  :documentation "\
-Super class for objects that want to persist to the file system.")
+(require 'config-manage)
 
 (defvar cframe-settings-restore-hooks nil
   "Functions to call with `cframae-settings-restore' is called.
 When hook functions are called `setting' is bound to an instance
 of `cframe-settings'.")
 
-(cl-defmethod cframe-persistent-persist-value ((this cframe-persistent) val)
-  (or (and (consp val)
-	   (or (let ((fval (car val)))
-		 (and fval
-		      (eieio-object-p fval)
-		      (object-of-class-p fval 'cframe-persistent)
-		      (-map (lambda (val)
-			      (cframe-persistent-persist val))
-			    val)))))
-      val))
-
-(cl-defmethod cframe-persistent-persist-slots ((this cframe-persistent))
-  "Persist the slots of the instance."
-  (with-slots (slots) this
-    (->> slots
-	 (-map (lambda (slot)
-		 (let ((val (->> (slot-value this slot)
-				 (cframe-persistent-persist-value this))))
-		   (cons slot val)))))))
-
-(cl-defmethod cframe-persistent-persist ((this cframe-persistent))
-  "Persist an object."
-  (append `((class . ,(eieio-object-class this))
-	    (slots . ,(cframe-persistent-persist-slots this)))
-	  (condition-case nil
-	      (cl-call-next-method this)
-	    (cl-no-next-method))))
-
-(cl-defmethod cframe-persistent-unpersist-value ((this cframe-persistent) val)
-  (or (and (consp val)
-	   (or (let ((fval (car val)))
-		 (and (consp fval)
-		      (consp (car fval))
-		      (eq 'class (caar fval))
-		      (-map (lambda (val)
-			      (cframe-persistent-unpersist val))
-			    val)))))
-      val))
-
-(cl-defmethod cframe-persistent-unpersist ((this cframe-persistent) vals)
-  "Persist an object."
-  (with-slots (slots) this
-    (->> slots
-	 (-map (lambda (slot)
-		 (let ((val (->> (cdr (assq slot vals))
-				 (cframe-persistent-unpersist-value this))))
-		   (setf (slot-value this slot) val)))))))
-
-(cl-defmethod cframe-persistent-unpersist ((vals list))
-  (let* ((class (cdr (assq 'class vals)))
-	 (slots (cdr (assq 'slots vals)))
-	 (obj (make-instance class)))
-    (cframe-persistent-unpersist obj slots)
-    obj))
-
-
-(defclass cframe-persistable (cframe-persistent)
-  ((file :initarg :file
-	 :initform nil
-	 :type (or null string)
-	 :documentation "The file to persist the state of the object."))
-  :documentation "Subclasses that can persist to a file.")
-
-(cl-defmethod cframe-persistable-save ((this cframe-persistable))
-  "Persist manager and compiler configuration."
-  (with-slots (file) this
-    (let ((save-class-name (->> this eieio-object-class eieio-class-name))
-	  (state (cframe-persistent-persist this)))
-      (with-temp-buffer
-	(insert (format "\
-;; -*- emacs-lisp -*- <%s %s>
-;; Object: %s.  Don't change this file.\n"
-			(time-stamp-string "%02y/%02m/%02d %02H:%02M:%02S")
-			file save-class-name))
-	(insert (with-output-to-string
-		  (pp state)))
-	(write-region (point-min) (point-max) file))
-      (message "Wrote %s" file))))
-
-
-
-(defclass cframe-setting (cframe-persistent)
-  ((name :initarg :name
-	 :initform "narrow"
-	 :type string)
-   (width :initarg :width
+(defclass cframe-setting (config-entry)
+  ((width :initarg :width
 	  :initform 80
 	  :type integer
 	  :documentation "Width of the frame.")
@@ -158,7 +65,12 @@ of `cframe-settings'.")
   "Return the setting's frame."
   (selected-frame))
 
-(cl-defmethod cframe-setting-save ((this cframe-setting))
+(cl-defmethod config-entry-description ((this config-entry))
+  "Get the description of the configuration entry."
+  (with-slots (width height) this
+    (format "w: %d, h: %d" width height)))
+
+(cl-defmethod config-entry-save ((this cframe-setting))
   "Save the current frame configuration."
   (let ((frame (cframe-setting-frame this)))
     (with-slots (width height position) this
@@ -166,7 +78,7 @@ of `cframe-settings'.")
 	    height (frame-height frame)
 	    position (frame-position)))))
 
-(cl-defmethod cframe-setting-restore ((this cframe-setting))
+(cl-defmethod config-entry-restore ((this cframe-setting))
   "Restore the frame to the current state of the setting."
   (let ((frame (cframe-setting-frame this)))
     (with-slots (name width height position) this
@@ -180,9 +92,10 @@ of `cframe-settings'.")
 				       &optional new-name)
   "Set the name of the `cframe-setting'."
   (with-slots (name width) this
-    (let ((new-name (or new-name (cond ((<= width 80) "narrow")
-				       ((<= width 140) "wide")
-				       (t "huge")))))
+    (let ((new-name (or new-name
+			(cond ((<= width 80) "narrow")
+			      ((<= width 140) "wide")
+			      (t "huge")))))
       (setq name new-name))))
 
 (cl-defmethod object-format ((this cframe-setting))
@@ -191,9 +104,9 @@ of `cframe-settings'.")
 	    name (car position) (cdr position) width height)))
 
 (cl-defmethod initialize-instance ((this cframe-setting) &rest rest)
-  (cframe-setting-save this)
+  (config-entry-save this)
   (cframe-setting-set-name this)
-  (with-slots (slots) this
+  (with-slots (slots description width height) this
     (setq slots '(name width height position)))
   (apply #'cl-call-next-method this rest))
 
@@ -204,111 +117,44 @@ of `cframe-settings'.")
   (cons (display-pixel-height)
 	(display-pixel-width)))
 
-(defclass cframe-display (cframe-persistent)
-  ((name :initarg :name
-	 :initform "untitled"
-	 :type string
-	 :documentation "Name of this custom frame configuration.")
-   (id :initarg :id
+(defclass cframe-display (config-manager)
+  ((id :initarg :id
        :initform (cframe-display-id)
        :type cons
-       :documentation "Identifies this display.")
-   (settings :initarg :settings
-	     :initform nil;(list (cframe-setting))
-	     :type list
-	     :documentation "List of the settings for this frame.")
-   (sindex :initarg :sindex
-	   :initform 0
-	   :type integer
-	   :documentation "Index of current setting."))
+       :documentation "Identifies this display."))
   :documentation "Represents a monitor display.")
 
-(defun cframe-display-insert-at-position (seq elt pos)
-  "Return SEQ with ELT inserted at position POS."
-  (append (cl-subseq seq 0 pos)
-	  (list elt)
-	  (cl-subseq seq pos)))
+(cl-defmethod config-manager-entry-default-name ((this cframe-display))
+  (with-slots (id) this
+    (format "Display (%d X %d)" (car id) (cdr id))))
 
-(cl-defmethod cframe-display-index ((this cframe-display) &optional index)
-  "Get the `cframe-setting' (`sindex' slot) index.
-
-If INDEX is given, disregard the `sindex' slot and adjust (mod
-it) to the cardinality of the settings."
-  (with-slots (settings sindex) this
-    (let ((slen (length settings)))
-      (if (= 0 slen)
-	  (error "No settings exist--use `cframe-add-or-advance-setting'"))
-      (-> (or index sindex)
-	  (mod slen)))))
-
-(cl-defmethod cframe-display-set-index ((this cframe-display) index)
-  "Get the `cframe-setting' (`sindex' slot) index.
-
-See `cframe-display-index'."
-  (with-slots (sindex) this
-    (->> (cframe-display-index this index)
-	 (setq sindex))))
-
-(cl-defmethod cframe-display-increment-index ((this cframe-display)
-					      &optional num)
-  "Increment the display index by NUM positions, which defaults to 1."
-  (with-slots (sindex) this
-    (cframe-display-set-index this (+ sindex (or num 1)))))
-
-(cl-defmethod cframe-display-setting ((this cframe-display) &optional index)
-  "Get the `cframe-setting' by INDEX."
-  (with-slots (settings) this
-    (nth (cframe-display-index this index) settings)))
-
-(cl-defmethod cframe-display-insert-setting ((this cframe-display)
-					     &optional setting)
-  "Add and optionally create first a new setting if SETTING is nil."
-  (with-slots (settings sindex) this
-    (setq settings
-	  (cframe-display-insert-at-position settings
-					     (or setting (cframe-setting))
-					     sindex))
-    (cl-incf sindex)))
-
-(cl-defmethod cframe-display-set-name ((this cframe-display)
-				       &optional new-name)
-  "Set the name of this `cframe-display' to NEW-NAME."
-  (with-slots (name id) this
-    (let ((new-name (or new-name
-			(format "(%d X %d)" (car id) (cdr id)))))
-      (setq name new-name))))
-
-(cl-defmethod cframe-display-setting-restore ((this cframe-display)
-					      &optional setting)
-  "Restore this `cframe-display' and contained `cframe-setting' instances."
-  (let ((setting (or setting (cframe-display-setting this))))
-    (cframe-setting-restore setting)))
+(cl-defmethod config-manager-new-entry ((this cframe-display)
+					&optional criteria)
+  (cframe-setting))
 
 (cl-defmethod object-format ((this cframe-display))
-  (with-slots (name id settings sindex) this
-    (format "%s [%s]: %d settings, index: %d"
-	    name id (length settings)
-	    (cframe-display-index this))))
+  (with-slots (name id entries) this
+    (format "%s [%s]: %d entries"
+	    name id (length entries))))
+
+(cl-defmethod config-manager--update-entries ((this cframe-display) entries)
+  (cframe-save))
 
 (cl-defmethod initialize-instance ((this cframe-display) &rest rest)
-  (with-slots (slots lists) this
-    (setq slots '(name id sindex settings)))
-  (apply #'cl-call-next-method this rest)
-  (cframe-display-set-name this))
+  (with-slots (slots list-header-fields cycle-method) this
+    (setq slots (append slots '(id))
+	  cycle-method 'next
+	  list-header-fields '("C" "Name" "Dimensions")))
+  (apply #'cl-call-next-method this rest))
 
 
 
-(defclass cframe-manager (cframe-persistent cframe-persistable)
+(defclass cframe-manager (config-persistent config-persistable)
   ((displays :initarg :displays
 	     :initform nil
 	     :type list
 	     :documentation "Displays that have settings."))
   :documentation "Manages displays.")
-
-(cl-defmethod initialize-instance ((this cframe-manager) &rest rest)
-  (with-slots (slots) this
-    (setq slots '(displays file)))
-  (apply #'cl-call-next-method this rest))
 
 (cl-defmethod cframe-manager-display ((this cframe-manager)
 				      &optional no-create-p id)
@@ -326,25 +172,27 @@ If the dipslay doesn't exist create a new display if NO-CREATE-P is non-nil."
 	      displays (append displays (list display))))
       display)))
 
-(cl-defmethod cframe-manager-insert-setting ((this cframe-manager)
-					     &optional setting)
-  (-> (cframe-manager-display this)
-      (cframe-display-insert-setting setting)))
-
 (cl-defmethod cframe-manager-advance-display ((this cframe-manager)
-					      &optional index num)
-  "Iterate the settings index in the current display and restore it.
+					      &optional criteria)
+  "Iterate the settings for the current display and restore it.
 
-This increments the display index by NUM positions, which defaults to 1.
+See `config-manager-entry' for the CRITERIA parameter."
+  (let ((criteria (or criteria 'cycle)))
+    (-> (cframe-manager-display this)
+	(config-manager-switch criteria))))
 
-This modifies the frame settings."
-  (let ((display (cframe-manager-display this))
-	(num (or num 1)))
-    (if index (cframe-display-set-index display index))
-    (cframe-display-increment-index display num)
-    (cframe-display-setting-restore display)))
+(cl-defmethod cframe-manager-reset ((this cframe-manager))
+  (with-slots (displays) this
+    (dolist (display displays)
+      (config-manager-list-clear display))))
+
+(cl-defmethod initialize-instance ((this cframe-manager) &rest rest)
+  (with-slots (slots) this
+    (setq slots '(displays)))
+  (apply #'cl-call-next-method this rest))
 
 
+;; funcs
 
 (defgroup cframe nil
   "Customize a frame and fast switch size and positions."
@@ -358,11 +206,15 @@ This modifies the frame settings."
   :group 'cframe
   :set (lambda (sym val)
 	 (set-default sym val)
-	 (if (boundp 'the-cframe-manager)
+	 (if (and (boundp 'the-cframe-manager)
+		  the-cframe-manager)
 	     (oset the-cframe-manager :file val))))
 
 (defvar the-cframe-manager nil
   "The singleton manager instance.")
+
+(defun the-cframe-manager ()
+  (or the-cframe-manager (cframe-restore)))
 
 ;;;###autoload
 (defun cframe-current-setting (&optional include-display-p)
@@ -371,28 +223,13 @@ This modifies the frame settings."
 If INCLUDE-DISPLAY-P is non-nil, or provided interactively with
 \\[universal-argument]]."
   (interactive "P")
-  (let* ((display (-> the-cframe-manager
+  (let* ((display (-> (the-cframe-manager)
 		      cframe-manager-display))
-	 (setting (cframe-display-setting display)))
+	 (setting (config-manager-current-instance display)))
     (-> (if include-display-p
 	    (concat (object-format display) ", "))
 	(concat (object-format setting))
 	message)))
-
-;;;###autoload
-(defun cframe-display-list ()
-  "Display a list of displays and their settings."
-  (interactive)
-  (with-current-buffer (get-buffer-create "*Frame Customize*")
-    (erase-buffer)
-    (insert "Custom Frame Settings:\n\n")
-    (with-slots (displays) the-cframe-manager
-      (dolist (display displays)
-	(with-slots (settings) display
-	  (insert (format "- %s\n" (object-format display)))
-	  (dolist (setting settings)
-	    (insert (format "   - %s\n" (object-format setting)))))))
-    (display-buffer (current-buffer))))
 
 ;;;###autoload
 (defun cframe-add-or-advance-setting (addp)
@@ -400,42 +237,20 @@ If INCLUDE-DISPLAY-P is non-nil, or provided interactively with
   (interactive (list current-prefix-arg))
   (if addp
       (progn
-	(-> the-cframe-manager
-	    cframe-manager-insert-setting)
-	(cframe-save)
+	(-> (the-cframe-manager)
+	    cframe-manager-display
+	    config-manager-insert-entry)
 	(message "Added setting and saved"))
-    (-> the-cframe-manager
+    (-> (the-cframe-manager)
 	cframe-manager-advance-display))
   (cframe-current-setting))
-
-;;;###autoload
-(defun cframe-set-index-setting (index)
-  "Set the display's setting to INDEX and refresh the frame."
-  (interactive (list (or (if (consp current-prefix-arg)
-			     0
-			   current-prefix-arg)
-			 0)))
-  (-> the-cframe-manager
-      (cframe-manager-advance-display index 0))
-  (cframe-current-setting))
-
-;;;###autoload
-(defun cframe-reset ()
-  "Reset the state of the custom frame manager.
-
-This blows away all frame settings configuration in memory.  To
-wipe the state on the storage call `cframe-restore' or
-`cframe-add-or-advance-setting' after calling this."
-  (interactive)
-  (setq the-cframe-manager
-	(cframe-manager :file cframe-persistency-file-name)))
 
 ;;;###autoload
 (defun cframe-save ()
   "Save the state of all custom frame settings."
   (interactive)
-  (-> the-cframe-manager
-      cframe-persistable-save))
+  (-> (the-cframe-manager)
+      config-persistable-save))
 
 ;;;###autoload
 (defun cframe-restore ()
@@ -446,12 +261,39 @@ wipe the state on the storage call `cframe-restore' or
 		  (with-temp-buffer
 		    (insert-file-contents file)
 		    (->> (read (buffer-string))
-			 cframe-persistent-unpersist))
+			 config-persistent-unpersist))
 		(cframe-reset))))
     (oset mng :file file)
     (setq the-cframe-manager mng)
-    (cframe-manager-advance-display mng 0 0)
+    (cframe-manager-advance-display mng 'first)
     mng))
+
+;;;###autoload
+(defun cframe-reset (&optional hardp)
+  "Reset the state of the custom frame manager.
+
+HARDP means to recreate the manager instance, all data is reset
+\\(across all displays).  This is very destructive.
+
+This blows away all frame settings configuration in memory.  To
+wipe the state on the storage call `cframe-restore' or
+`cframe-add-or-advance-setting' after calling this."
+  (interactive "P")
+  (when (or hardp (not the-cframe-manager))
+    (setq the-cframe-manager
+	  (cframe-manager :file cframe-persistency-file-name)))
+  (cframe-manager-reset the-cframe-manager)
+  the-cframe-manager)
+
+;;;###autoload
+(defun cframe-list ()
+  "List settings for current display."
+  (interactive)
+  (let ((display (-> (the-cframe-manager)
+		     (cframe-manager-display t))))
+    (if display
+	(config-manager-list-entries-buffer display)
+      (error "No display entries--use `cframe-add-or-advance-setting'"))))
 
 (provide 'frame-customize)
 
