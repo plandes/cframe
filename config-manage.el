@@ -114,6 +114,26 @@ create unerpsist \(optionally) children classes and slots."
     (config-persistent-unpersist obj slots)
     obj))
 
+(cl-defmethod object-print-fields ((this config-persistent)) nil)
+
+(cl-defmethod object-print ((this config-persistent) &optional strings)
+  "Return a string as a representation of the in memory instance of THIS."
+  (cl-flet* ((format-obj
+  	      (slot)
+  	      (let ((obj (eieio-oref this slot)))
+  		(format "%S %s"
+  			slot
+  			(cond ((eieio-object-p obj) (object-print obj))
+  			      ((stringp obj) (format "'%s'" obj))
+  			      (obj))))))
+    (let ((fields (object-print-fields this)))
+      (apply #'cl-call-next-method this
+	     (cons (concat (if fields " ")
+			   (mapconcat #'format-obj
+				      fields
+				      " "))
+		   strings)))))
+
 
 
 (defclass config-persistable (config-persistent)
@@ -175,13 +195,6 @@ The description of this entry, used in `config-manager-list-entries-buffer'.")
   (error "No implementation of `config-entry-restore' for class `%S'"
 	 (eieio-object-class this)))
 
-(cl-defmethod object-format ((this config-entry))
-  (with-slots (name) this
-    name))
-
-(cl-defmethod object-print ((this config-entry))
-  (object-format this))
-
 
 
 (defclass config-manager (config-persistent)
@@ -199,13 +212,13 @@ The description of this entry, used in `config-manager-list-entries-buffer'.")
 				 (const :tag "Last Visited" last-visit)
 				 (const :tag "Next In Line" next))
 		 :documentation "\
-How entries are cycled by default when invoking `buffer-manager-switch'.
+How entries are cycled by default when invoking `config-manager-activate'.
 This parameter is used as the default for `criteria' \(see
-`buffer-manager-switch'), which is `cycle'.")
+`config-manager-activate'), which is `cycle'.")
    (entries :initarg :entries
 	    :initform nil		; initialize with 0 entries
 	    :type (or null list)
-	    :reader config-manager--entries
+	    ;:reader config-manager--entries
 	    :protection :private
 	    :documentation
 	    "Contains the data structure for the buffer entries.")
@@ -214,10 +227,7 @@ This parameter is used as the default for `criteria' \(see
 		       :type list
 		       :documentation "\
 List of fields used in output of `buffer-list'.")
-   (read-history :initform nil
-		 :protection :private
-		 :documentation "\
-Used for history when reading user input when switching to other buffers.")
+
    ;; careful: this slot keeps stale entries after they've been removed/killed
    (last-switched-to :initform nil
 		     :protection :private
@@ -240,11 +250,9 @@ Keeps track of the last entry for last-visit cycle method."))
 	  (list elt)
 	  (cl-subseq seq pos)))
 
-(cl-defmethod config-manager-new-entry ((this config-manager)
-					&optional criteria)
+(cl-defmethod config-manager-new-entry ((this config-manager) &rest args)
   "Create a new nascent entry object.
-Returns the config entry we switched to based on CRITERIA \(see
-`config-manager-entry'."
+ARGS are passed as a property list on instantiating the object."
   (error "No implementation of `config-manager-new-entry' for class `%S'"
 	 (eieio-object-class this)))
 
@@ -311,6 +319,36 @@ CRITERIA is:
 	(error "No entry exists that satisfies criteria `%S'" criteria))
     entry))
 
+(cl-defmethod config-manager--entries ((this config-manager)
+				       &optional include-fn exclude-fn sort-form)
+  "Return entries that match INCLUDE-FN and don't match EXCLUDE-FN.
+Entries returned are only entries contained in this instance of the
+`config-manager'.
+
+Sorting on the returned entries are done when SORT-FORM is non-`nil'.  Any
+sorting is only done on the returned set of entries and doesn't change any
+of the object's internal state.  Sorting is done based on SORT-FORM's value:
+ - symbol 'lexical: sort lexically based on the config entry's name
+ - function: sort using SORT-FORM as a predicate \(see `sort')."
+  (with-slots (entries) this
+    (setq include-fn (or include-fn (lambda (entry) t))
+	  exclude-fn (or exclude-fn (lambda (entry) nil)))
+    (let ((entries
+	   (remove nil (mapcar (lambda (entry)
+				 (if (and (funcall include-fn entry)
+					  (not (funcall exclude-fn entry)))
+				     entry))
+			       entries))))
+      (when sort-form
+	(cl-flet ((lexical-fn
+		   (a b)
+		   (string< (config-entry-name a) (config-entry-name b))))
+	  (let ((sort-fn (cond ((eq sort-form 'lexical) 'lexical-fn)
+			       ((functionp sort-form) sort-form)
+			       (t (error "Illegal sort form: %S" sort-form)))))
+	    (setq entries (sort entries sort-fn)))))
+      entries)))
+
 (cl-defmethod config-manager-current-instance ((this config-manager))
   (with-slots (last-switched-to) this
     (or last-switched-to
@@ -365,18 +403,26 @@ This is the typical unique name (buffers, files etc) creation."
 		      (concat name "<" (-> elt incf prin1-to-string) ">")
 		    name)))))
 
-(cl-defmethod config-manager-insert-entry ((this config-manager)
-					   &optional entry)
+;; (->> 'config-entry-name
+;;      symbol-function)
+;; (config-entry-name a)
+
+;; (cl-defmethod config-entry-name ((this config-entry))
+;;   (oref this :name))
+
+(cl-defmethod config-manager-insert-entry ((this config-manager) &rest args)
   "Add and optionally create first a new entry if ENTRY is nil."
-  (let* ((entry (or entry (config-manager-new-entry this)))
-  	 (name (config-entry-name entry)))
+  (let* ((entry (apply #'config-manager-new-entry this args))
+  	 (name (or (config-entry-name entry)
+		   (config-manager-entry-default-name this))))
     (with-slots (entries entry-index) this
       (->> entries
   	   (-map (lambda (elt)
   		   (config-entry-name elt)))
   	   (config-manager-iterate-name name)
   	   (config-entry-set-name entry))
-      (config-manager-cycle-entries this entry 'after))))
+      (config-manager-cycle-entries this entry 'after)
+      entry)))
 
 (cl-defmethod config-manager-set-name ((this config-manager)
 				       &optional new-name)
@@ -401,7 +447,7 @@ This is the typical unique name (buffers, files etc) creation."
 	(destructor entry)
 	entry))))
 
-(cl-defmethod config-manager-switch ((this config-manager) criteria)
+(cl-defmethod config-manager-activate ((this config-manager) criteria)
   "Switch to a config entry.
 
 If the config CRITERIA is the name of the config to switch to, go to that
@@ -409,8 +455,9 @@ config, otherwise, create a new one with that name and switch to it.
 Returns the config entry we switched to based on CRITERIA \(see
 `config-manager-entry')."
   (let ((entry (or (config-manager-entry this criteria)
-		   (config-manager-new-entry
-		    this (and (stringp criteria) criteria)))))
+		   (apply #'config-manager-new-entry
+			  this (and (stringp criteria)
+				    `(:name ,criteria))))))
     (config-entry-restore entry)
     (config-manager-cycle-entries this entry)
     (config-manage-refresh-windows)
@@ -660,7 +707,7 @@ EVENT mouse event data."
   (setq name (or name (config-manage-mode-name-at-point)))
   (let ((this config-manager-instance))
     (config-manage-mode-assert)
-    (config-manager-switch this name)))
+    (config-manager-activate this name)))
 
 (defun config-manage-mode-view (&optional name)
   "Activates the buffer entry with name NAME."
@@ -669,7 +716,7 @@ EVENT mouse event data."
   (setq name (or name (config-manage-mode-name-at-point)))
   (let ((this config-manager-instance))
     (config-manage-mode-assert)
-    (config-manager-switch this name nil 'split)))
+    (config-manager-activate this name nil 'split)))
 
 (defun config-manage-mode-set-status (status)
   "Set the mode status to STATUS for the mode."

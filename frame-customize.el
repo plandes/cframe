@@ -128,8 +128,7 @@ of `cframe-settings'.")
   (with-slots (id) this
     (format "Display (%d X %d)" (car id) (cdr id))))
 
-(cl-defmethod config-manager-new-entry ((this cframe-display)
-					&optional criteria)
+(cl-defmethod config-manager-new-entry ((this cframe-display) &rest args)
   (cframe-setting))
 
 (cl-defmethod object-format ((this cframe-display))
@@ -179,7 +178,7 @@ If the dipslay doesn't exist create a new display if NO-CREATE-P is non-nil."
 See `config-manager-entry' for the CRITERIA parameter."
   (let ((criteria (or criteria 'cycle)))
     (-> (cframe-manager-display this)
-	(config-manager-switch criteria))))
+	(config-manager-activate criteria))))
 
 (cl-defmethod cframe-manager-reset ((this cframe-manager))
   (with-slots (displays) this
