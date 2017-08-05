@@ -43,7 +43,7 @@
 (require 'eieio)
 
 (defclass config-persistent ()
-  ((slots :initarg :slots
+  ((pslots :initarg :pslots
 	  :initform nil
 	  :type list))
   :documentation "\
@@ -68,8 +68,8 @@ this error:
 
 (cl-defmethod config-persistent-persist-slots ((this config-persistent))
   "Persist the slots of the instance."
-  (with-slots (slots) this
-    (->> slots
+  (with-slots (pslots) this
+    (->> pslots
 	 (-map (lambda (slot)
 		 (let ((val (->> (slot-value this slot)
 				 (config-persistent-persist-value this))))
@@ -98,8 +98,8 @@ create unerpsist \(optionally) children classes and slots."
 
 (cl-defmethod config-persistent-unpersist ((this config-persistent) vals)
   "Persist an object."
-  (with-slots (slots) this
-    (->> slots
+  (with-slots (pslots) this
+    (->> pslots
 	 (-map (lambda (slot)
 		 (let ((val (->> (cdr (assq slot vals))
 				 (config-persistent-unpersist-value this))))
@@ -187,13 +187,11 @@ The description of this entry, used in `config-manager-list-entries-buffer'.")
 
 (cl-defmethod config-entry-save ((this config-entry))
   "Save the current entry configuration."
-  (error "No implementation of `config-entry-save' for class `%S'"
-	 (eieio-object-class this)))
+  nil)
 
 (cl-defmethod config-entry-restore ((this config-entry))
   "Restore the current entry configuration."
-  (error "No implementation of `config-entry-restore' for class `%S'"
-	 (eieio-object-class this)))
+  nil)
 
 
 
@@ -250,9 +248,9 @@ Keeps track of the last entry for last-visit cycle method."))
 	  (list elt)
 	  (cl-subseq seq pos)))
 
-(cl-defmethod config-manager-new-entry ((this config-manager) &rest args)
+(cl-defmethod config-manager-new-entry ((this config-manager) &optional slots)
   "Create a new nascent entry object.
-ARGS are passed as a property list on instantiating the object."
+SLOTS are passed as a property list on instantiating the object."
   (error "No implementation of `config-manager-new-entry' for class `%S'"
 	 (eieio-object-class this)))
 
@@ -394,7 +392,7 @@ This is the typical unique name (buffers, files etc) creation."
 	       (if (string-match (concat name "\\(?:<\\([0-9]+\\)>\\)?$") elt)
 		   (let ((expr (match-string 1 elt)))
 		     (or (and expr (read expr))
-			 0)))))
+			 1)))))
        (-filter #'identity)
        (cons -1)
        (reduce #'max)
@@ -403,16 +401,9 @@ This is the typical unique name (buffers, files etc) creation."
 		      (concat name "<" (-> elt incf prin1-to-string) ">")
 		    name)))))
 
-;; (->> 'config-entry-name
-;;      symbol-function)
-;; (config-entry-name a)
-
-;; (cl-defmethod config-entry-name ((this config-entry))
-;;   (oref this :name))
-
-(cl-defmethod config-manager-insert-entry ((this config-manager) &rest args)
+(cl-defmethod config-manager-add-entry ((this config-manager) &optional slots)
   "Add and optionally create first a new entry if ENTRY is nil."
-  (let* ((entry (apply #'config-manager-new-entry this args))
+  (let* ((entry (config-manager-new-entry this slots))
   	 (name (or (config-entry-name entry)
 		   (config-manager-entry-default-name this))))
     (with-slots (entries entry-index) this
@@ -423,6 +414,10 @@ This is the typical unique name (buffers, files etc) creation."
   	   (config-entry-set-name entry))
       (config-manager-cycle-entries this entry 'after)
       entry)))
+
+(cl-defmethod config-manager-insert-entry ((this config-manager)
+					   &optional context)
+  (config-manager-add-entry this))
 
 (cl-defmethod config-manager-set-name ((this config-manager)
 				       &optional new-name)
@@ -559,7 +554,8 @@ BUFFER-NAME is the name of the buffer holding the entries for the mode."
 	(erase-buffer)
 	(config-manage-mode)
 	(config-manager-list-entries this)
-	(config-manage-mode-first-buffer)
+	;(goto-char (point-min))
+	;(forward-line 4)
 	(set-window-point (get-buffer-window (current-buffer)) (point))
 	(set (make-local-variable 'config-manager-instance) this)
 	(set-buffer-modified-p nil)
@@ -568,11 +564,24 @@ BUFFER-NAME is the name of the buffer holding the entries for the mode."
 	  "Menu for Buffer Manage." config-manage-mode-menu-definition)))
     (switch-to-buffer buf)))
 
-(cl-defmethod initialize-instance ((this config-manager) &rest rest)
-  (with-slots (slots) this
-    (setq slots
-	  (append slots '(name entries))))
-  (apply #'cl-call-next-method this rest)
+(cl-defmethod config-manager-read-new-name ((this config-manager)
+					    &optional prompt auto-generate-p)
+  "Read a buffer name from user input."
+  (let ((def (config-manager-entry-default-name this))
+	name)
+    (if auto-generate-p
+	def
+      (setq prompt (or prompt (capitalize (config-manager-name this))))
+      (setq prompt (choice-program-default-prompt prompt def))
+      (setq name (read-string prompt nil nil def))
+      (if (= 0 (length name)) (setq name nil))
+      name)))
+
+(cl-defmethod initialize-instance ((this config-manager) &optional slots)
+  (with-slots (pslots) this
+    (setq pslots
+	  (append pslots '(name entries))))
+  (cl-call-next-method this slots)
   (config-manager-set-name this))
 
 (defun config-manage-refresh-windows ()
@@ -679,10 +688,10 @@ EVENT mouse event data."
     (if (string= name config-manage-on-mouse-down)
 	(config-manage-mode-activate-buffer name))))
 
-(defun config-manage-mode-first-buffer ()
-  "Go to the first buffer entry in the buffer listing."
-  (goto-char (point-min))
-  (forward-line 2))
+;; (defun config-manage-mode-first-buffer ()
+;;   "Go to the first buffer entry in the buffer listing."
+;;   (goto-char (point-min))
+;;   (forward-line 2))
 
 (defun config-manage-mode-next ()
   "Called by pressing the `tab' key in `config-manage-mode'."
@@ -731,13 +740,13 @@ EVENT mouse event data."
   "Refresh the buffer entry listing buffer."
   (interactive)
   (config-manage-mode-assert)
-  (let ((line (1+ (count-lines (point-min) (point)))))
+  (let ((line (count-lines (point-min) (point))))
     (setq buffer-read-only nil)
     (erase-buffer)
     (config-manager-list-entries config-manager-instance)
     (setq buffer-read-only t)
     (goto-char (point-min))
-    (forward-line 2)
+    (forward-line line)
     (beginning-of-line)
     (set-window-point (get-buffer-window (current-buffer)) (point))))
 
@@ -809,7 +818,7 @@ value of FUNC."
   (interactive)
   (let* ((this config-manager-instance)
 	 (name (config-manager-read-new-name this)))
-    (config-manager-new-entry this name)
+    (config-manager-insert-entry this)
     (config-manage-mode-refresh)))
 
 (define-derived-mode config-manage-mode fundamental-mode "Configuration Manager"

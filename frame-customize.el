@@ -65,7 +65,7 @@ of `cframe-settings'.")
   "Return the setting's frame."
   (selected-frame))
 
-(cl-defmethod config-entry-description ((this config-entry))
+(cl-defmethod config-entry-description ((this cframe-setting))
   "Get the description of the configuration entry."
   (with-slots (width height) this
     (format "w: %d, h: %d" width height)))
@@ -103,12 +103,12 @@ of `cframe-settings'.")
     (format "%s: [top: %d, left: %d, width: %d, height: %d]"
 	    name (car position) (cdr position) width height)))
 
-(cl-defmethod initialize-instance ((this cframe-setting) &rest rest)
+(cl-defmethod initialize-instance ((this cframe-setting) &optional args)
   (config-entry-save this)
   (cframe-setting-set-name this)
-  (with-slots (slots description width height) this
-    (setq slots '(name width height position)))
-  (apply #'cl-call-next-method this rest))
+  (with-slots (pslots description width height) this
+    (setq pslots '(name width height position)))
+  (cl-call-next-method this args))
 
 
 
@@ -128,7 +128,7 @@ of `cframe-settings'.")
   (with-slots (id) this
     (format "Display (%d X %d)" (car id) (cdr id))))
 
-(cl-defmethod config-manager-new-entry ((this cframe-display) &rest args)
+(cl-defmethod config-manager-new-entry ((this cframe-display) &optional args)
   (cframe-setting))
 
 (cl-defmethod object-format ((this cframe-display))
@@ -139,12 +139,12 @@ of `cframe-settings'.")
 (cl-defmethod config-manager--update-entries ((this cframe-display) entries)
   (cframe-save))
 
-(cl-defmethod initialize-instance ((this cframe-display) &rest rest)
-  (with-slots (slots list-header-fields cycle-method) this
-    (setq slots (append slots '(id))
+(cl-defmethod initialize-instance ((this cframe-display) &optional args)
+  (with-slots (pslots list-header-fields cycle-method) this
+    (setq pslots (append pslots '(id))
 	  cycle-method 'next
 	  list-header-fields '("C" "Name" "Dimensions")))
-  (apply #'cl-call-next-method this rest))
+  (cl-call-next-method this args))
 
 
 
@@ -185,10 +185,10 @@ See `config-manager-entry' for the CRITERIA parameter."
     (dolist (display displays)
       (config-manager-list-clear display))))
 
-(cl-defmethod initialize-instance ((this cframe-manager) &rest rest)
-  (with-slots (slots) this
-    (setq slots '(displays)))
-  (apply #'cl-call-next-method this rest))
+(cl-defmethod initialize-instance ((this cframe-manager) &optional args)
+  (with-slots (pslots) this
+    (setq pslots '(displays)))
+  (cl-call-next-method this args))
 
 
 ;; funcs
@@ -238,7 +238,7 @@ If INCLUDE-DISPLAY-P is non-nil, or provided interactively with
       (progn
 	(-> (the-cframe-manager)
 	    cframe-manager-display
-	    config-manager-insert-entry)
+	    config-manager-add-entry)
 	(message "Added setting and saved"))
     (-> (the-cframe-manager)
 	cframe-manager-advance-display))
