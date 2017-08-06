@@ -12,9 +12,26 @@ with a key binding rather than using your mouse.
 
 ## Usage
 
-This library *learns* frame positions with `M-x cframe-add-or-advance-setting`
-and then cycles through configuratinos with `cframe-add-or-advance-setting`.
-You can pull up the [entries buffer] with `cframe-list`.
+This library uses much of the functinality of
+the
+[config-manage](https://github.com/plandes/buffer-manage/blob/master/config-manage.el) library.
+It *learns* frame configurations, then restores them later on:
+
+* Record frame positions with `M-x cframe-add-or-advance-setting`.
+* Restore previous settings on start up with `cframe-restore`.
+* Cycles through configuratinos with `cframe-add-or-advance-setting`.
+* Pull up the [entries buffer] with `cframe-list`.
+
+I use the following in my `~/.emacs` configuration file:
+```elisp
+(require 'frame-customize)
+
+;; frame size settings based on screen dimentions
+(global-set-key "\C-x9" 'cframe-restore)
+
+;; doesn't clobber anything in shell, emacs lisp buffers (maybe others?)
+(global-set-key "\C-\\" 'cframe-add-or-advance-setting)
+```
 
 
 ## Changelog
