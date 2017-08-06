@@ -2,12 +2,12 @@
 
 ;; Copyright (C) 2015 - 2017 Paul Landes
 
-;; Version: 0.2
+;; Version: 0.1
 ;; Author: Paul Landes
 ;; Maintainer: Paul Landes
 ;; Keywords: frame customize
 ;; URL: https://github.com/plandes/frame-customize
-;; Package-Requires: ((emacs "25") (noflet) (dash))
+;; Package-Requires: ((emacs "25") (buffer-manage "0.2"))
 
 ;; This file is not part of GNU Emacs.
 
@@ -28,17 +28,20 @@
 
 ;;; Commentary:
 
-;; Allows for customization of frame types, which include among other
-;; things, height and width of new Emacs frames.  Options included
-;; are all of those which are included from `make-frame'.
+;; Allows for customization of frame types, which includes height and width of new
+;; Emacs frames.  Options included are all of those which are included from
+;; `make-frame'.  This is handy for those that rather resize your Emacs frames
+;; with a key binding rather than using your mouse.
+
+;; This library *learns* frame positions with `M-x cframe-add-or-advance-setting'
+;; and then cycles through configuratinos with `cframe-add-or-advance-setting'.
+;; You can pull up the [entries buffer] with `cframe-list`.
 
 ;;; Code:
 
 (require 'cl-lib)
 (require 'eieio)
-(require 'time-stamp)
 (require 'dash)
-(require 'noflet)
 (require 'config-manage)
 
 (defvar cframe-settings-restore-hooks nil
@@ -213,6 +216,7 @@ See `config-manager-entry' for the CRITERIA parameter."
   "The singleton manager instance.")
 
 (defun the-cframe-manager ()
+  "Return the configuration manager singleton."
   (or the-cframe-manager (cframe-restore)))
 
 ;;;###autoload
