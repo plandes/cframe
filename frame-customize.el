@@ -28,12 +28,12 @@
 
 ;;; Commentary:
 
-;; Allows for customization of frame types, which includes height and width of new
-;; Emacs frames.  Options included are all of those which are included from
-;; `make-frame`.  This is handy for those that rather resize your Emacs frames
-;; with a key binding than using your mouse.
+;; Allows for customization of Emacs frames, which include height and width of
+;; new Emacs frames.  Options for new frames are those given to `make-frame`.
+;; This is handy for those that rather resize your Emacs frames with a key
+;; binding than using your mouse.
 
-;; The library *learns* frame configurations, then restores them later on:
+;; The library "learns" frame configurations, then restores them later on:
 
 ;; * Record frame positions with `M-x cframe-add-or-advance-setting`.
 ;; * Restore previous settings on start up with `cframe-restore`.

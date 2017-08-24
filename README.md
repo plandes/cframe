@@ -4,10 +4,10 @@
 [![MELPA stable badge][melpa-stable-badge]][melpa-stable-link]
 [![Travis CI Build Status][travis-badge]][travis-link]
 
-Allows for customization of frame types, which includes height and width of new
-Emacs frames.  Options included are all of those which are included from
-`make-frame`.  This is handy for those that rather resize your Emacs frames
-with a key binding than using your mouse.
+Allows for customization of Emacs frames, which include height and width of
+new Emacs frames.  Options for new frames are those given to `make-frame`.
+This is handy for those that rather resize your Emacs frames with a key binding
+than using your mouse.
 
 
 ## Usage
@@ -15,7 +15,7 @@ with a key binding than using your mouse.
 This library uses much of the functinality of
 the
 [config-manage](https://github.com/plandes/buffer-manage/blob/master/config-manage.el) library.
-It *learns* frame configurations, then restores them later on:
+It "learns" frame configurations, then restores them later on:
 
 * Record frame positions with `M-x cframe-add-or-advance-setting`.
 * Restore previous settings on start up with `cframe-restore`.
