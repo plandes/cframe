@@ -9,9 +9,9 @@
 (require 'dash)
 (require 'frame-customize)
 
-(ert-deftest test-load ()
-  "Test successful evaluation of frame-customize"
-  (should t))
+(ert-deftest test-cframe-settings ()
+  "Settings creation"
+  (should (< 0 (length (object-format (cframe-setting))))))
 
 (provide 'frame-customize-test)
 

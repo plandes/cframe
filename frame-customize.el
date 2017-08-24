@@ -7,7 +7,7 @@
 ;; Maintainer: Paul Landes
 ;; Keywords: frame customize
 ;; URL: https://github.com/plandes/frame-customize
-;; Package-Requires: ((emacs "25") (buffer-manage "0.2"))
+;; Package-Requires: ((emacs "25") (buffer-manage "0.3"))
 
 ;; This file is not part of GNU Emacs.
 
@@ -45,7 +45,7 @@
 ;; (require 'frame-customize)
 ;; ;; frame size settings based on screen dimentions
 ;; (global-set-key "\C-x9" 'cframe-restore)
-;; ;; doesn't clobber anything in shell, emacs lisp buffers (maybe others?)
+;; ;; doesn't clobber anything in shell, Emacs Lisp buffers (maybe others?)
 ;; (global-set-key "\C-\\" 'cframe-add-or-advance-setting)
 
 ;;; Code:
