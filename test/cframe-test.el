@@ -1,7 +1,7 @@
 ;;; package --- Summary
 ;;; Commentary:
 ;;
-;; Unit tests of frame-customize-test.el
+;; Unit tests of cframe-test.el
 ;;
 ;;; Code:
 
@@ -13,6 +13,6 @@
   "Settings creation"
   (should (< 0 (length (object-format (cframe-setting))))))
 
-(provide 'frame-customize-test)
+(provide 'cframe-test)
 
-;;; frame-customize-test ends here
+;;; cframe-test ends here

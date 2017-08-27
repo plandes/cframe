@@ -12,5 +12,5 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 First major release.
 
 
-[Unreleased]: https://github.com/plandes/frame-customize/compare/v0.1...HEAD
-[0.1]: https://github.com/plandes/frame-customize/compare/0c28b86...v0.1
+[Unreleased]: https://github.com/plandes/cframe/compare/v0.1...HEAD
+[0.1]: https://github.com/plandes/cframe/compare/0c28b86...v0.1

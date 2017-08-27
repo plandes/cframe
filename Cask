@@ -6,7 +6,7 @@
 	    :git "https://github.com/plandes/buffer-manage"
 	    :files ("*.el"))
 
-(package-file "frame-customize.el")
+(package-file "cframe.el")
 
 (files "*.el" "doc/*.texi" (:exclude ".dir-locals.el"))
 

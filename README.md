@@ -24,7 +24,7 @@ It "learns" frame configurations, then restores them later on:
 
 I use the following in my `~/.emacs` configuration file:
 ```elisp
-(require 'frame-customize)
+(require 'cframe)
 
 ;; frame size settings based on screen dimentions
 (global-set-key "\C-x9" 'cframe-restore)
@@ -49,9 +49,9 @@ GNU Lesser General Public License, Version 2.0
 <!-- links -->
 [entries buffer]: https://github.com/plandes/buffer-manage#entries-mode
 
-[melpa-link]: https://melpa.org/#/frame-customize
-[melpa-stable-link]: https://stable.melpa.org/#/frame-customize
-[melpa-badge]: https://melpa.org/packages/frame-customize-badge.svg
-[melpa-stable-badge]: https://stable.melpa.org/packages/frame-customize-badge.svg
-[travis-link]: https://travis-ci.org/plandes/frame-customize
-[travis-badge]: https://travis-ci.org/plandes/frame-customize.svg?branch=master
+[melpa-link]: https://melpa.org/#/cframe
+[melpa-stable-link]: https://stable.melpa.org/#/cframe
+[melpa-badge]: https://melpa.org/packages/cframe-badge.svg
+[melpa-stable-badge]: https://stable.melpa.org/packages/cframe-badge.svg
+[travis-link]: https://travis-ci.org/plandes/cframe
+[travis-badge]: https://travis-ci.org/plandes/cframe.svg?branch=master
