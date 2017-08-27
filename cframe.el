@@ -1,4 +1,4 @@
-;;; frame-customize.el --- customize a frame and fast switch size and positions
+;;; cframe.el --- customize a frame and fast switch size and positions
 
 ;; Copyright (C) 2015 - 2017 Paul Landes
 
@@ -6,7 +6,7 @@
 ;; Author: Paul Landes
 ;; Maintainer: Paul Landes
 ;; Keywords: frame customize
-;; URL: https://github.com/plandes/frame-customize
+;; URL: https://github.com/plandes/cframe
 ;; Package-Requires: ((emacs "25") (buffer-manage "0.3"))
 
 ;; This file is not part of GNU Emacs.
@@ -42,7 +42,7 @@
 
 ;; I use the following in my `~/.emacs` configuration file:
 
-;; (require 'frame-customize)
+;; (require 'cframe)
 ;; ;; frame size settings based on screen dimentions
 ;; (global-set-key "\C-x9" 'cframe-restore)
 ;; ;; doesn't clobber anything in shell, Emacs Lisp buffers (maybe others?)
@@ -309,6 +309,6 @@ wipe the state on the storage call `cframe-restore' or
 	(config-manager-list-entries-buffer display)
       (error "No display entries--use `cframe-add-or-advance-setting'"))))
 
-(provide 'frame-customize)
+(provide 'cframe)
 
-;;; frame-customize.el ends here
+;;; cframe.el ends here

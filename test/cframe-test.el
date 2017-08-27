@@ -7,7 +7,7 @@
 
 (require 'ert)
 (require 'dash)
-(require 'frame-customize)
+(require 'cframe)
 
 (ert-deftest test-cframe-settings ()
   "Settings creation"
