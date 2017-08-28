@@ -2,6 +2,7 @@
 (source gnu)
 (source melpa)
 
+(depends-on "dash")
 (depends-on "buffer-manage"
 	    :git "https://github.com/plandes/buffer-manage"
 	    :files ("*.el"))
