@@ -2,10 +2,8 @@
 (source gnu)
 (source melpa)
 
-(depends-on "dash" "20170727.212")
-(depends-on "buffer-manage"
-	    :git "https://github.com/plandes/buffer-manage"
-	    :files ("*.el"))
+(depends-on "dash" "2.13.0")
+(depends-on "buffer-manage" "0.6")
 
 (package-file "cframe.el")
 
