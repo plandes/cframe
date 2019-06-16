@@ -154,7 +154,7 @@ of `cframe-settings'.")
   (with-slots (id) this
     (format "Display (%d X %d)" (car id) (cdr id))))
 
-(cl-defmethod config-manager-new-entry ((this cframe-display) &optional args)
+(cl-defmethod config-manager-new-entry ((this cframe-display) &optional slots)
   (cframe-setting))
 
 (cl-defmethod object-format ((this cframe-display))
