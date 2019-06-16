@@ -73,7 +73,18 @@ of `cframe-settings'.")
 	     :initform (0 . 0)
 	     :type cons
 	     :documentation "Top/left position of the frame."))
+  :method-invocation-order :c3
   :documentation "A frame settings: size and location.")
+
+(cl-defmethod initialize-instance ((this cframe-setting) &optional slots)
+  (config-entry-save this)
+  (cframe-setting-set-name this)
+  ;; (with-slots (pslots description width height) this
+  ;;   (setq pslots '(object-name width height position)))
+  (setq slots (plist-put slots :pslots
+			 (append (plist-get slots :pslots)
+				 '(width height position))))
+  (cl-call-next-method this slots))
 
 (cl-defmethod cframe-setting-frame ((this cframe-setting))
   "Return the setting's frame."
@@ -95,7 +106,7 @@ of `cframe-settings'.")
 (cl-defmethod config-entry-restore ((this cframe-setting))
   "Restore the frame to the current state of the setting."
   (let ((frame (cframe-setting-frame this)))
-    (with-slots (name width height position) this
+    (with-slots (width height position) this
       (set-frame-width frame width)
       (set-frame-height frame height)
       (set-frame-position frame (car position) (cdr position)))
@@ -105,24 +116,18 @@ of `cframe-settings'.")
 (cl-defmethod cframe-setting-set-name ((this cframe-setting)
 				       &optional new-name)
   "Set the name of the `cframe-setting'."
-  (with-slots (name width) this
-    (let ((new-name (or new-name
-			(cond ((<= width 80) "narrow")
-			      ((<= width 140) "wide")
-			      (t "huge")))))
-      (setq name new-name))))
+  (with-slots (width) this
+   (let ((new-name (or new-name
+		       (cond ((<= width 80) "narrow")
+			     ((<= width 140) "wide")
+			     (t "huge")))))
+     (config-entry-set-name this new-name))))
 
 (cl-defmethod object-format ((this cframe-setting))
-  (with-slots (name width height position) this
+  (with-slots (width height position) this
     (format "%s: [top: %d, left: %d, width: %d, height: %d]"
-	    name (car position) (cdr position) width height)))
-
-(cl-defmethod initialize-instance ((this cframe-setting) &optional args)
-  (config-entry-save this)
-  (cframe-setting-set-name this)
-  (with-slots (pslots description width height) this
-    (setq pslots '(name width height position)))
-  (cl-call-next-method this args))
+	    (cl-call-next-method this)
+	    (car position) (cdr position) width height)))
 
 
 
@@ -136,7 +141,19 @@ of `cframe-settings'.")
        :initform (cframe-display-id)
        :type cons
        :documentation "Identifies this display."))
+  :method-invocation-order :c3
   :documentation "Represents a monitor display.")
+
+(cl-defmethod initialize-instance ((this cframe-display) &optional slots)
+  (setq slots (plist-put slots :pslots
+			 (append (plist-get slots :pslots) '(id)))
+	slots (plist-put slots :cycle-method 'next)
+	slots (plist-put slots :list-header-fields
+			 '("C" "Name" "Dimensions")))
+    ;; (setq pslots (append pslots '(id))
+    ;; 	  cycle-method 'next
+    ;; 	  list-header-fields '("C" "Name" "Dimensions")))
+  (cl-call-next-method this slots))
 
 (cl-defmethod config-manager-entry-default-name ((this cframe-display))
   (with-slots (id) this
@@ -146,28 +163,29 @@ of `cframe-settings'.")
   (cframe-setting))
 
 (cl-defmethod object-format ((this cframe-display))
-  (with-slots (name id entries) this
+  (with-slots (id entries) this
     (format "%s [%s]: %d entries"
-	    name id (length entries))))
+	    (cl-call-next-method this) id (length entries))))
 
 (cl-defmethod config-manager--update-entries ((this cframe-display) entries)
   (cframe-save))
 
-(cl-defmethod initialize-instance ((this cframe-display) &optional args)
-  (with-slots (pslots list-header-fields cycle-method) this
-    (setq pslots (append pslots '(id))
-	  cycle-method 'next
-	  list-header-fields '("C" "Name" "Dimensions")))
-  (cl-call-next-method this args))
-
 
 
-(defclass cframe-manager (config-persistent config-persistable)
+(defclass cframe-manager (config-persistable)
   ((displays :initarg :displays
 	     :initform nil
 	     :type list
 	     :documentation "Displays that have settings."))
+  :method-invocation-order :c3
   :documentation "Manages displays.")
+
+(cl-defmethod initialize-instance ((this cframe-manager) &optional slots)
+  (setq slots (plist-put slots :pslots
+			 (append (plist-get slots :pslots) '(displays))))
+  ;; (with-slots (pslots) this
+  ;;   (setq pslots '(displays)))
+  (cl-call-next-method this slots))
 
 (cl-defmethod cframe-manager-display ((this cframe-manager)
 				      &optional no-create-p id)
@@ -198,11 +216,6 @@ See `config-manager-entry' for the CRITERIA parameter."
   (with-slots (displays) this
     (dolist (display displays)
       (config-manager-list-clear display))))
-
-(cl-defmethod initialize-instance ((this cframe-manager) &optional args)
-  (with-slots (pslots) this
-    (setq pslots '(displays)))
-  (cl-call-next-method this args))
 
 
 ;; funcs
