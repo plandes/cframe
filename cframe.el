@@ -79,8 +79,6 @@ of `cframe-settings'.")
 (cl-defmethod initialize-instance ((this cframe-setting) &optional slots)
   (config-entry-save this)
   (cframe-setting-set-name this)
-  ;; (with-slots (pslots description width height) this
-  ;;   (setq pslots '(object-name width height position)))
   (setq slots (plist-put slots :pslots
 			 (append (plist-get slots :pslots)
 				 '(width height position))))
@@ -150,9 +148,6 @@ of `cframe-settings'.")
 	slots (plist-put slots :cycle-method 'next)
 	slots (plist-put slots :list-header-fields
 			 '("C" "Name" "Dimensions")))
-    ;; (setq pslots (append pslots '(id))
-    ;; 	  cycle-method 'next
-    ;; 	  list-header-fields '("C" "Name" "Dimensions")))
   (cl-call-next-method this slots))
 
 (cl-defmethod config-manager-entry-default-name ((this cframe-display))
@@ -183,8 +178,6 @@ of `cframe-settings'.")
 (cl-defmethod initialize-instance ((this cframe-manager) &optional slots)
   (setq slots (plist-put slots :pslots
 			 (append (plist-get slots :pslots) '(displays))))
-  ;; (with-slots (pslots) this
-  ;;   (setq pslots '(displays)))
   (cl-call-next-method this slots))
 
 (cl-defmethod cframe-manager-display ((this cframe-manager)
