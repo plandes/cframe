@@ -7,7 +7,7 @@
 ;; Maintainer: Paul Landes
 ;; Keywords: frame customize
 ;; URL: https://github.com/plandes/cframe
-;; Package-Requires: ((emacs "25") (buffer-manage "0.6") (dash "2.13.0"))
+;; Package-Requires: ((emacs "25") (buffer-manage "0.9") (dash "2.13.0"))
 
 ;; This file is not part of GNU Emacs.
 
