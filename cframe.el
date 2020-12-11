@@ -165,6 +165,12 @@ of `cframe-settings'.")
 (cl-defmethod config-manager--update-entries ((this cframe-display) entries)
   (cframe-save))
 
+(cl-defmethod config-manager-list-entries-buffer ((this cframe-display)
+						  &optional buffer-name)
+  (->> (config-manager-name this)
+       capitalize
+       (format "*%s Entries*")
+       (cl-call-next-method this)))
 
 
 (defclass cframe-manager (config-persistable)
@@ -192,7 +198,7 @@ If the dipslay doesn't exist create a new display if NO-CREATE-P is non-nil."
 					   (not (equal find-id id)))))
 			 car)))
       (when (and (null display) (not no-create-p))
-	(setq display (cframe-display)
+	(setq display (cframe-display "frame")
 	      displays (append displays (list display))))
       display)))
 
