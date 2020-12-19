@@ -1,14 +1,14 @@
 ;; -*- emacs-lisp -*-
 (source gnu)
-(source melpa)
+(source melpa-stable)
 
-(depends-on "dash" "2.13.0")
-(depends-on "buffer-manage" "0.6")
+(depends-on "dash" "2.17.0")
+(depends-on "buffer-manage" "0.11")
 
 (package-file "cframe.el")
 
 (files "*.el" "doc/*.texi" (:exclude ".dir-locals.el"))
 
 (development
- (depends-on "dash")
+ (depends-on "package-lint")
  (depends-on "ert-runner"))

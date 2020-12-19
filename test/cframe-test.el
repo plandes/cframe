@@ -11,7 +11,7 @@
 
 (ert-deftest test-cframe-settings ()
   "Settings creation"
-  (should (< 0 (length (object-format (cframe-setting))))))
+  (should (< 0 (length (cl-prin1-to-string (cframe-setting))))))
 
 (provide 'cframe-test)
 

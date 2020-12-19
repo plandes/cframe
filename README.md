@@ -2,7 +2,7 @@
 
 [![MELPA badge][melpa-badge]][melpa-link]
 [![MELPA stable badge][melpa-stable-badge]][melpa-stable-link]
-[![Travis CI Build Status][travis-badge]][travis-link]
+[![Build Status][build-badge]][build-link]
 
 Allows for customization of Emacs frames, which include height and width of
 new Emacs frames.  Options for new frames are those given to `make-frame`.
@@ -41,7 +41,7 @@ An extensive changelog is available [here](CHANGELOG.md).
 
 ## License
 
-Copyright © 2017 Paul Landes
+Copyright © 2017 - 2020 Paul Landes
 
 GNU Lesser General Public License, Version 2.0
 
@@ -53,5 +53,5 @@ GNU Lesser General Public License, Version 2.0
 [melpa-stable-link]: https://stable.melpa.org/#/cframe
 [melpa-badge]: https://melpa.org/packages/cframe-badge.svg
 [melpa-stable-badge]: https://stable.melpa.org/packages/cframe-badge.svg
-[travis-link]: https://travis-ci.org/plandes/cframe
-[travis-badge]: https://travis-ci.org/plandes/cframe.svg?branch=master
+[build-badge]: https://github.com/plandes/cframe/workflows/CI/badge.svg
+[build-link]: https://github.com/plandes/cframe/actions

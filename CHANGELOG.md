@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 
+## [0.3] - 2020-12-18
+### Changed
+- Upgraded [zenbuild].
+- Compat with recent *flycheck* and `package-lint`.
+- Updated dependencies.
+- Switched from Travis to GitHub workflows.
+
+### Added
+- Documentation
+
+### Changed
+- CLOS multiple inheritance method dispatching
+- Make `eieio-named` compatible.
+
+
 ## [0.1] - 2019-06-16
 ### Changed
 - Retrofit to `buffer-manage` 0.9.
@@ -18,6 +33,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 First major release.
 
 
-[Unreleased]: https://github.com/plandes/cframe/compare/v0.2...HEAD
+[Unreleased]: https://github.com/plandes/cframe/compare/v0.3...HEAD
+[0.3]: https://github.com/plandes/cframe/compare/v0.2...v0.3
 [0.2]: https://github.com/plandes/cframe/compare/v0.1...v0.2
 [0.1]: https://github.com/plandes/cframe/compare/0c28b86...v0.1
+
+[zenbuild]: https://github.com/plandes/zenbuild
