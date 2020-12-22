@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2015 - 2020 Paul Landes
 
-;; Version: 0.3
+;; Version: 0.4
 ;; Author: Paul Landes
 ;; Maintainer: Paul Landes
 ;; Keywords: frames
