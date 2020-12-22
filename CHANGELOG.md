@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 
+## [0.4] - 2020-12-22
+### Added
+- Support for full and maximized frames using `toggle-frame-maximized` and
+  `toggle-frame-maximized`.  Now configurations support full screen mode (for
+  operating systems that support it) and maximized frames.
+
+
 ## [0.3] - 2020-12-18
 ### Changed
 - Upgraded [zenbuild].
@@ -33,7 +40,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 First major release.
 
 
-[Unreleased]: https://github.com/plandes/cframe/compare/v0.3...HEAD
+[Unreleased]: https://github.com/plandes/cframe/compare/v0.4...HEAD
+[0.4]: https://github.com/plandes/cframe/compare/v0.3...v0.4
 [0.3]: https://github.com/plandes/cframe/compare/v0.2...v0.3
 [0.2]: https://github.com/plandes/cframe/compare/v0.1...v0.2
 [0.1]: https://github.com/plandes/cframe/compare/0c28b86...v0.1

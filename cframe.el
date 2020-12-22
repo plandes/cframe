@@ -47,6 +47,9 @@
 ;; (global-set-key "\C-x9" 'cframe-restore)
 ;; ;; doesn't clobber anything in shell, Emacs Lisp buffers (maybe others?)
 ;; (global-set-key "\C-\\" 'cframe-add-or-advance-setting)
+;; ;; toggle full or maximized screen
+;; (global-set-key "\C-x\C-\\" 'cframe-toggle-frame-full-or-maximized)
+
 
 ;;; Code:
 
@@ -72,7 +75,14 @@ of `cframe-settings'.")
    (position :initarg :position
 	     :initform (0 . 0)
 	     :type cons
-	     :documentation "Top/left position of the frame."))
+	     :documentation "Top/left position of the frame.")
+   (full-mode :initarg :full-mode
+	      :initform none
+	      :type symbol
+	      :documentation "One of to indicate the frame is in:
+ * `fullscreen': full screen mode
+ * `maximized': maximized taking up the entire screen
+ * `none': neither fullscreen nor maximized"))
   :method-invocation-order :c3
   :documentation "A frame settings: size and location.")
 
@@ -82,7 +92,7 @@ of `cframe-settings'.")
   (cframe-setting-set-name this)
   (setq slots (plist-put slots :pslots
 			 (append (plist-get slots :pslots)
-				 '(width height position))))
+				 '(width height position full-mode))))
   (cl-call-next-method this slots))
 
 (cl-defmethod cframe-setting-frame ((this cframe-setting))
@@ -92,24 +102,55 @@ of `cframe-settings'.")
 
 (cl-defmethod config-entry-description ((this cframe-setting))
   "Get the description of THIS configuration's entry."
-  (with-slots (width height) this
-    (format "w: %d, h: %d" width height)))
+  (with-slots (width height full-mode) this
+    (format "w: %d, h: %d, f: %S" width height full-mode)))
+
+(cl-defmethod cframe-setting-frame-attributes ((this cframe-setting))
+  "Return attributes about THIS frame."
+  (let ((frame (cframe-setting-frame this)))
+    (-> frame
+	frame-monitor-attributes
+	(append (cons (cons 'fullscreen
+			    (frame-parameter frame 'fullscreen))
+		      nil)))))
+
+(cl-defmethod cframe-setting-frame-full-mode ((this cframe-setting))
+  "Return THIS frame's full mode as a symbol.
+
+See the `cframe-setting' class's `full-slot' for more information."
+  (cl-case (->> (cframe-setting-frame-attributes this)
+		(assq 'fullscreen)
+		cdr)
+    ('fullscreen 'fullscreen)
+    ('fullboth 'fullscreen)
+    ('maximized 'maximized)
+    (t 'none)))
 
 (cl-defmethod config-entry-save ((this cframe-setting))
   "Save THIS current frame's configuration."
   (let ((frame (cframe-setting-frame this)))
-    (with-slots (width height position) this
+    (with-slots (width height position full-mode) this
       (setq width (frame-width frame)
 	    height (frame-height frame)
-	    position (frame-position)))))
+	    position (frame-position)
+	    full-mode (cframe-setting-frame-full-mode this)))))
 
 (cl-defmethod config-entry-restore ((this cframe-setting))
   "Restore THIS frame's to the current state of the setting."
-  (let ((frame (cframe-setting-frame this)))
+  (let ((frame (cframe-setting-frame this))
+	(prev-full-mode (cframe-setting-frame-full-mode this))
+	(next-full-mode (slot-value this 'full-mode)))
     (with-slots (width height position) this
-      (set-frame-width frame width)
-      (set-frame-height frame height)
-      (set-frame-position frame (car position) (cdr position)))
+      (unless (eq prev-full-mode next-full-mode)
+	(cl-case prev-full-mode
+	  ('fullscreen (toggle-frame-fullscreen))
+	  ('maximized (toggle-frame-maximized))))
+      (cl-case next-full-mode
+	('fullscreen (toggle-frame-fullscreen))
+	('maximized (toggle-frame-maximized))
+	(t (set-frame-width frame width)
+	   (set-frame-height frame height)
+	   (set-frame-position frame (car position) (cdr position)))))
     (let ((setting this))
       (ignore setting)
       (run-hooks 'cframe-settings-restore-hooks))))
@@ -117,20 +158,22 @@ of `cframe-settings'.")
 (cl-defmethod cframe-setting-set-name ((this cframe-setting)
 				       &optional new-name)
   "Set the name of THIS `cframe-setting' to NEW-NAME."
-  (with-slots (width) this
-    (let ((new-name (or new-name
-			(cond ((<= width 80) "narrow")
-			      ((<= width 140) "wide")
-			      (t "huge")))))
+  (with-slots (width full-mode) this
+    (let ((new-name
+	   (or new-name
+	       (cond ((not (eq 'none full-mode)) (prin1-to-string full-mode))
+		     ((<= width 80) "narrow")
+		     ((<= width 140) "wide")
+		     (t "huge")))))
       (config-entry-set-name this new-name))))
 
 (cl-defmethod eieio-object-name-string ((this cframe-setting))
   "Return a string as a representation of the in memory instance of THIS."
-  (with-slots (object-name width height position) this
-    (format "%s: [top: %d, left: %d, width: %d, height: %d]"
+  (with-slots (object-name width height position full-mode) this
+    (format "%s: [top: %d, left: %d, width: %d, height: %d, full: %S]"
 	    (or (slot-value this 'object-name)
 		(cl-call-next-method))
-	    (car position) (cdr position) width height)))
+	    (car position) (cdr position) width height full-mode)))
 
 
 
@@ -209,9 +252,9 @@ If the dipslay doesn't exist create a new display if NO-CREATE-P is non-nil."
   (with-slots (displays) this
     (let* ((find-id (or id (cframe-display-id)))
 	   (display (->> displays
-			 (cl-remove-if (lambda (display)
-					 (with-slots (id) display
-					   (not (equal find-id id)))))
+			 (cl-remove-if #'(lambda (display)
+					   (with-slots (id) display
+					     (not (equal find-id id)))))
 			 car)))
       (when (and (null display) (not no-create-p))
 	(setq display (cframe-display :object-name "frame")
@@ -268,12 +311,19 @@ If INCLUDE-DISPLAY-P is non-nil, or provided interactively with
   (interactive "P")
   (let* ((display (-> (cframe-manager-singleton)
 		      cframe-manager-display))
-	 (setting (config-manager-current-instance display))
-	 (fmt-fn #'eieio-object-name-string))
-    (-> (if include-display-p
-	    (concat (funcall fmt-fn display) ", "))
-	(concat (funcall fmt-fn setting))
-	message)))
+	 (setting (config-manager-current-instance display)))
+    (when (called-interactively-p 'interactive)
+      (let ((fmt-fn #'eieio-object-name-string))
+	(->> (if include-display-p
+		 (let ((props (mapconcat
+			       #'(lambda (arg)
+				   (format "%s=%s" (car arg) (cdr arg)))
+			       (cframe-setting-frame-attributes setting)
+			       ", ")))
+		   (concat (funcall fmt-fn display) ", " props)))
+	     (concat (funcall fmt-fn setting))
+	     message)))
+    setting))
 
 ;;;###autoload
 (defun cframe-add-or-advance-setting (addp)
@@ -333,11 +383,23 @@ wipe the state on the storage call `cframe-restore' or
 (defun cframe-list ()
   "List settings for current display."
   (interactive)
-  (let ((display (-> (cframe-manager-singleton)
-		     (cframe-manager-display t))))
+  (let ((display (cframe-manager-display (cframe-manager-singleton) t)))
     (if display
 	(config-manager-list-entries-buffer display)
       (error "No display entries--use `cframe-add-or-advance-setting'"))))
+
+
+
+;; utility
+
+;;;###autoload
+(defun cframe-toggle-frame-full-or-maximized (maximized-p)
+  "Either change to full screen mode or maximize the window when MAXIMIZED-P."
+  (interactive "P")
+  (funcall (if maximized-p
+	       #'toggle-frame-maximized
+	     #'toggle-frame-fullscreen)))
+
 
 (provide 'cframe)
 
