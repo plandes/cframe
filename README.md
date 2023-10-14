@@ -4,25 +4,24 @@
 [![MELPA stable badge][melpa-stable-badge]][melpa-stable-link]
 [![Build Status][build-badge]][build-link]
 
-Allows for customization of Emacs frames, which include height and width of
-new Emacs frames.  Options for new frames are those given to `make-frame`.
-This is handy for those that rather resize your Emacs frames with a key binding
-than using your mouse.
+Emacs frames position and dimensions are "learned" from user provided frame
+configurations, then restores them later.  This is for users that prefer to
+resize Emacs frames with a key binding rather than the mouse.
+
+To use this library:
+
+1. Position the frame how you like it.
+2. Record the frame with `M-x cframe-add-or-advance-setting`.
+3. Restore previous settings on start up with `cframe-restore`.
+4. Cycle through configurations with `cframe-add-or-advance-setting`.
+
+You can get a list of the configuration and which is currently used with
+`cframe-list`.
 
 
-## Usage
+## Recommended Configuration
 
-This library uses much of the functinality of
-the
-[config-manage](https://github.com/plandes/buffer-manage/blob/master/config-manage.el) library.
-It "learns" frame configurations, then restores them later on:
-
-* Record frame positions with `M-x cframe-add-or-advance-setting`.
-* Restore previous settings on start up with `cframe-restore`.
-* Cycles through configuratinos with `cframe-add-or-advance-setting`.
-* Pull up the [entries buffer] with `cframe-list`.
-
-I use the following in my `~/.emacs` configuration file:
+Recommended `~/.emacs` configuration to restore the frame on start up:
 ```elisp
 (require 'cframe)
 
@@ -41,7 +40,7 @@ An extensive changelog is available [here](CHANGELOG.md).
 
 ## License
 
-Copyright © 2017 - 2020 Paul Landes
+Copyright © 2017 - 2023 Paul Landes
 
 GNU Lesser General Public License, Version 2.0
 
@@ -55,3 +54,5 @@ GNU Lesser General Public License, Version 2.0
 [melpa-stable-badge]: https://stable.melpa.org/packages/cframe-badge.svg
 [build-badge]: https://github.com/plandes/cframe/workflows/CI/badge.svg
 [build-link]: https://github.com/plandes/cframe/actions
+
+[config-manage]: https://github.com/plandes/buffer-manage/blob/master/config-manage.el
