@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 
+## [1.0] - 2023-11-01
+### Changes
+- Fixed warning: class definition initform.
+
+
 ## [0.4] - 2020-12-22
 ### Added
 - Support for full and maximized frames using `toggle-frame-maximized` and
@@ -40,7 +45,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 First major release.
 
 
-[Unreleased]: https://github.com/plandes/cframe/compare/v0.4...HEAD
+[Unreleased]: https://github.com/plandes/cframe/compare/v1.0...HEAD
+[1.0]: https://github.com/plandes/cframe/compare/v0.4...v1.0
 [0.4]: https://github.com/plandes/cframe/compare/v0.3...v0.4
 [0.3]: https://github.com/plandes/cframe/compare/v0.2...v0.3
 [0.2]: https://github.com/plandes/cframe/compare/v0.1...v0.2
