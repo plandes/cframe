@@ -186,7 +186,7 @@ See the `cframe-setting' class's `full-slot' for more information."
 
 (defclass cframe-display (config-manager)
   ((id :initarg :id
-       :initform (cframe-display-id)
+       :initform '(cframe-display-id)
        :type cons
        :documentation "Identifies this display."))
   :method-invocation-order :c3
