@@ -79,7 +79,7 @@ of `cframe-settings'.")
 	     :type cons
 	     :documentation "Top/left position of the frame.")
    (full-mode :initarg :full-mode
-	      :initform none
+	      :initform 'none
 	      :type symbol
 	      :documentation "One of to indicate the frame is in:
  * `fullscreen': full screen mode
@@ -123,9 +123,9 @@ See the `cframe-setting' class's `full-slot' for more information."
   (cl-case (->> (cframe-setting-frame-attributes this)
 		(assq 'fullscreen)
 		cdr)
-    ('fullscreen 'fullscreen)
-    ('fullboth 'fullscreen)
-    ('maximized 'maximized)
+    (fullscreen 'fullscreen)
+    (fullboth 'fullscreen)
+    (maximized 'maximized)
     (t 'none)))
 
 (cl-defmethod config-entry-save ((this cframe-setting))
@@ -145,11 +145,11 @@ See the `cframe-setting' class's `full-slot' for more information."
     (with-slots (width height position) this
       (unless (eq prev-full-mode next-full-mode)
 	(cl-case prev-full-mode
-	  ('fullscreen (toggle-frame-fullscreen))
-	  ('maximized (toggle-frame-maximized))))
+	  (fullscreen (toggle-frame-fullscreen))
+	  (maximized (toggle-frame-maximized))))
       (cl-case next-full-mode
-	('fullscreen (toggle-frame-fullscreen))
-	('maximized (toggle-frame-maximized))
+	(fullscreen (toggle-frame-fullscreen))
+	(maximized (toggle-frame-maximized))
 	(t (set-frame-width frame width)
 	   (set-frame-height frame height)
 	   (set-frame-position frame (car position) (cdr position)))))
