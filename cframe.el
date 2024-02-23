@@ -186,7 +186,6 @@ See the `cframe-setting' class's `full-slot' for more information."
 
 (defclass cframe-display (config-manager)
   ((id :initarg :id
-       :initform '(cframe-display-id)
        :type cons
        :documentation "Identifies this display."))
   :method-invocation-order :c3
@@ -198,7 +197,8 @@ See the `cframe-setting' class's `full-slot' for more information."
 			 (append (plist-get slots :pslots) '(id)))
 	slots (plist-put slots :cycle-method 'next)
 	slots (plist-put slots :list-header-fields
-			 '("C" "Name" "Dimensions")))
+			 '("C" "Name" "Dimensions"))
+	slots (plist-put slots :id (cframe-display-id)))
   (cl-call-next-method this slots))
 
 (cl-defmethod config-manager-entry-default-name ((this cframe-display))
