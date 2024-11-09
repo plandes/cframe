@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 
 
+### Changes
+- Fix case of frame not resizing when moving across screens with smaller
+  dimensions.
+
+
 ## [1.0] - 2023-11-01
 ### Changes
 - Fixed warning: class definition initform.

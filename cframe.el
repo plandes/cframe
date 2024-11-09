@@ -75,7 +75,7 @@ of `cframe-settings'.")
 	   :type integer
 	   :documentation "Height of the frame.")
    (position :initarg :position
-	     :initform (0 . 0)
+	     :initform '(0 . 0)
 	     :type cons
 	     :documentation "Top/left position of the frame.")
    (full-mode :initarg :full-mode
@@ -139,9 +139,9 @@ See the `cframe-setting' class's `full-slot' for more information."
 
 (cl-defmethod config-entry-restore ((this cframe-setting))
   "Restore THIS frame's to the current state of the setting."
-  (let ((frame (cframe-setting-frame this))
-	(prev-full-mode (cframe-setting-frame-full-mode this))
-	(next-full-mode (slot-value this 'full-mode)))
+  (let* ((frame (cframe-setting-frame this))
+	 (prev-full-mode (cframe-setting-frame-full-mode this))
+	 (next-full-mode (slot-value this 'full-mode)))
     (with-slots (width height position) this
       (unless (eq prev-full-mode next-full-mode)
 	(cl-case prev-full-mode
@@ -150,9 +150,15 @@ See the `cframe-setting' class's `full-slot' for more information."
       (cl-case next-full-mode
 	(fullscreen (toggle-frame-fullscreen))
 	(maximized (toggle-frame-maximized))
-	(t (set-frame-width frame width)
-	   (set-frame-height frame height)
-	   (set-frame-position frame (car position) (cdr position)))))
+	;; temporarily resize the frame to be smaller when moving to a new
+	;; screen that is smaller
+	(t (when (< (frame-height frame) height)
+	     (set-frame-height frame 1))
+	   (when (< (frame-width frame) width)
+	     (set-frame-width frame 1))
+	   (set-frame-position frame (car position) (cdr position))
+	   (set-frame-width frame width)
+	   (set-frame-height frame height))))
     (let ((setting this))
       (ignore setting)
       (run-hooks 'cframe-settings-restore-hooks))))
