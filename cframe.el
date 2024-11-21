@@ -138,7 +138,8 @@ See the `cframe-setting' class's `full-slot' for more information."
 	    full-mode (cframe-setting-frame-full-mode this)))))
 
 (cl-defmethod config-entry-restore ((this cframe-setting))
-  "Restore THIS frame's to the current state of the setting."
+  "Restore THIS frame's to the current state of the setting.
+See `cframe-restore-delay'."
   (let* ((frame (cframe-setting-frame this))
 	 (prev-full-mode (cframe-setting-frame-full-mode this))
 	 (next-full-mode (slot-value this 'full-mode)))
@@ -157,7 +158,8 @@ See the `cframe-setting' class's `full-slot' for more information."
 	   (set-frame-height frame height)
 	   (when (or (not (eq (frame-height frame) height))
 		     (not (eq (frame-width frame) width)))
-	     (sit-for 0.5)
+	     (message "Resize failed probably due to screen bounds on switch")
+	     (sit-for cframe-restore-delay)
 	     (set-frame-width frame width)
 	     (set-frame-height frame height)))))
     (let ((setting this))
@@ -290,8 +292,7 @@ See `config-manager-entry' for the CRITERIA parameter."
 ;; funcs
 (defgroup cframe nil
   "Customize a frame and fast switch size and positions."
-  :group 'cframe
-  :prefix "cframe-")
+  :group 'cframe)
 
 (defcustom cframe-persistency-file-name
   (expand-file-name "cframe" user-emacs-directory)
@@ -303,6 +304,17 @@ See `config-manager-entry' for the CRITERIA parameter."
 	 (if (and (boundp 'cframe-manager-singleton)
 		  cframe-manager-singleton)
 	     (oset cframe-manager-singleton :file val))))
+
+(defcustom cframe-restore-delay 0.5
+  "The delay before resizing the frame after the last attempt failed.
+In some cases, when the frame moves to a smaller screen, the resize may fail
+because the frame has larger extents than the screen.  The order of resizing to
+moving does not fix the problem since resize on the current screen might be
+too small.  To fix this, `config-entry-restore' moves the frame, then tries to
+resize it.  If it failes, it delays for the duration of this value to give
+XWindows time move the frame and then tries the reszie again."
+  :type 'number
+  :group 'cframe)
 
 (defvar cframe-manager-singleton nil
   "The singleton manager instance.")
