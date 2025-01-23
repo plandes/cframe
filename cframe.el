@@ -1,13 +1,13 @@
 ;;; cframe.el --- Customize a frame and fast switch size and positions  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2015 - 2023 Paul Landes
+;; Copyright (C) 2015 - 2025 Paul Landes
 
-;; Version: 0.4
+;; Version: 0.5
 ;; Author: Paul Landes
 ;; Maintainer: Paul Landes
 ;; Keywords: frames
 ;; URL: https://github.com/plandes/cframe
-;; Package-Requires: ((emacs "26") (buffer-manage "0.11") (dash "2.17.0"))
+;; Package-Requires: ((emacs "26") (buffer-manage "1.1") (dash "2.17.0"))
 
 ;; This file is not part of GNU Emacs.
 
