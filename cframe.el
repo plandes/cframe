@@ -60,6 +60,32 @@
 (require 'dash)
 (require 'config-manage)
 
+(defgroup cframe nil
+  "Customize a frame and fast switch size and positions."
+  :group 'cframe)
+
+(defcustom cframe-persistency-file-name
+  (expand-file-name "cframe" user-emacs-directory)
+  "File containing the Flex compile configuration data."
+  :type 'file
+  :group 'cframe
+  :set (lambda (sym val)
+	 (set-default sym val)
+	 (if (and (boundp 'cframe-manager-singleton)
+		  cframe-manager-singleton)
+	     (oset cframe-manager-singleton :file val))))
+
+(defcustom cframe-restore-delay 0.2
+  "The delay before resizing the frame after the last attempt failed.
+In some cases, when the frame moves to a smaller screen, the resize may fail
+because the frame has larger extents than the screen.  The order of resizing to
+moving does not fix the problem since resize on the current screen might be
+too small.  To fix this, `config-entry-restore' moves the frame, then tries to
+resize it.  If it failes, it delays for the duration of this value to give
+XWindows time move the frame and then tries the reszie again."
+  :type 'number
+  :group 'cframe)
+
 (defvar cframe-settings-restore-hooks nil
   "Functions to call with `cframae-settings-restore' is called.
 When hook functions are called `setting' is bound to an instance
@@ -159,9 +185,10 @@ See `cframe-restore-delay'."
 	   (when (or (not (eq (frame-height frame) height))
 		     (not (eq (frame-width frame) width)))
 	     (message "Resize failed probably due to screen bounds on switch")
-	     (sit-for cframe-restore-delay)
+	     (sleep-for cframe-restore-delay)
 	     (set-frame-width frame width)
-	     (set-frame-height frame height)))))
+	     (set-frame-height frame height)
+	     (set-frame-position frame (car position) (cdr position))))))
     (let ((setting this))
       (ignore setting)
       (run-hooks 'cframe-settings-restore-hooks))))
@@ -289,33 +316,7 @@ See `config-manager-entry' for the CRITERIA parameter."
 
 
 
-;; funcs
-(defgroup cframe nil
-  "Customize a frame and fast switch size and positions."
-  :group 'cframe)
-
-(defcustom cframe-persistency-file-name
-  (expand-file-name "cframe" user-emacs-directory)
-  "File containing the Flex compile configuration data."
-  :type 'file
-  :group 'cframe
-  :set (lambda (sym val)
-	 (set-default sym val)
-	 (if (and (boundp 'cframe-manager-singleton)
-		  cframe-manager-singleton)
-	     (oset cframe-manager-singleton :file val))))
-
-(defcustom cframe-restore-delay 0.5
-  "The delay before resizing the frame after the last attempt failed.
-In some cases, when the frame moves to a smaller screen, the resize may fail
-because the frame has larger extents than the screen.  The order of resizing to
-moving does not fix the problem since resize on the current screen might be
-too small.  To fix this, `config-entry-restore' moves the frame, then tries to
-resize it.  If it failes, it delays for the duration of this value to give
-XWindows time move the frame and then tries the reszie again."
-  :type 'number
-  :group 'cframe)
-
+;; instance and functions
 (defvar cframe-manager-singleton nil
   "The singleton manager instance.")
 
