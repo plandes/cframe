@@ -130,8 +130,10 @@ of `cframe-settings'.")
 
 (cl-defmethod config-entry-description ((this cframe-setting))
   "Get the description of THIS configuration's entry."
-  (with-slots (width height full-mode) this
-    (format "w: %d, h: %d, f: %S" width height full-mode)))
+  (with-slots (width height position full-mode) this
+    (format "%d X %d @ %d, %d, f: %s" width height
+	    (car position) (cdr position)
+	    (if (eq full-mode 'none) "n" "y"))))
 
 (cl-defmethod cframe-setting-frame-attributes ((this cframe-setting))
   "Return attributes about THIS frame."
@@ -183,7 +185,8 @@ See `cframe-restore-delay'."
 	   (set-frame-width frame width)
 	   (set-frame-height frame height)
 	   (when (or (not (eq (frame-height frame) height))
-		     (not (eq (frame-width frame) width)))
+		     (not (eq (frame-width frame) width))
+		     (not (equal (frame-position frame) position)))
 	     (message "Resize failed probably due to screen bounds on switch")
 	     (sleep-for cframe-restore-delay)
 	     (set-frame-width frame width)
